@@ -1,0 +1,18 @@
+{
+  "name": "mercy-ministry-app",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:kiosk": "npm -w @mercy/kiosk run dev",
+    "dev:admin": "npm -w @mercy/admin run dev",
+    "build:shared": "npm -w @mercy/shared run build",
+    "build:kiosk": "npm -w @mercy/shared run build && npm -w @mercy/kiosk run build",
+    "build:admin": "npm -w @mercy/shared run build && npm -w @mercy/admin run build",
+    "build": "npm -w @mercy/shared run build && npm -w @mercy/kiosk run build && npm -w @mercy/admin run build",
+    "test": "vitest run",
+    "lint": "eslint ."
+  }
+}
