@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-navy text-white antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+    overflow: hidden;
+    height: 100dvh;
+  }
+
+  #root {
+    height: 100dvh;
+  }
+}
+
+@layer components {
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .kiosk-button {
+    @apply touch-target rounded-2xl px-8 py-5 text-kiosk-xl font-semibold
+           transition-all duration-200 active:scale-95 focus:outline-none
+           focus-visible:ring-4 focus-visible:ring-gold/50;
+  }
+
+  .kiosk-button-primary {
+    @apply kiosk-button bg-gold text-navy hover:bg-gold-400;
+  }
+
+  .kiosk-button-secondary {
+    @apply kiosk-button bg-navy-400 text-white border-2 border-white/20
+           hover:bg-navy-300;
+  }
+
+  .kiosk-button-outline {
+    @apply kiosk-button bg-transparent text-white border-2 border-white/40
+           hover:border-white/70 hover:bg-white/5;
+  }
+}
