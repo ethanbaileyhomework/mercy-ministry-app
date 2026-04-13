@@ -1,26 +1,26 @@
 import { RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ErrorBoundary } from '@mercy/shared';
 import { router } from './router';
-import { useOfflineSync } from './hooks/useOfflineSync';
+import { CoordinatorProvider } from './context/CoordinatorContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes
+      staleTime: 1000 * 60 * 5,
       retry: 2,
     },
   },
 });
 
-function KioskApp() {
-  useOfflineSync();
-  return <RouterProvider router={router} />;
-}
-
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <KioskApp />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <CoordinatorProvider>
+          <RouterProvider router={router} />
+        </CoordinatorProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

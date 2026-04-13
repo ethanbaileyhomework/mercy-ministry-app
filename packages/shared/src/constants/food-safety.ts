@@ -1,28 +1,25 @@
 /**
- * Victorian Food Safety compliance thresholds.
- * Food Act 1984 (Vic) + Food Safety Standard 3.2.2
- *
- * Temperature Danger Zone: 5°C - 60°C
- * Hot food must be held at >= 60°C
- * Cold food must be held at <= 5°C
- * Reheated food must reach >= 75°C core temperature
+ * Victorian Food Safety compliance — Food Act 1984 (Vic)
+ * Hot holding:  >= 60°C
+ * Cold holding:  <= 5°C
+ * Reheating:    >= 75°C (must reach 75°C before serving)
+ * Fridge units: <= 5°C  (equipment check)
  */
 export const FOOD_SAFETY = {
   hotMinTemp: 60,
   coldMaxTemp: 5,
   reheatMinTemp: 75,
-  tempCheckIntervalMinutes: 120,
-  dangerZone: { min: 5, max: 60 },
+  fridgeMaxTemp: 5,
 } as const;
 
 export function evaluateTemperature(
-  tempCelsius: number,
-  category: 'hot_meal' | 'cold_item' | 'dairy' | 'produce' | 'packaged'
-): 'PASS' | 'FAIL' | 'ADVISORY' {
-  if (category === 'packaged') return 'ADVISORY';
-  if (category === 'hot_meal') {
-    return tempCelsius >= FOOD_SAFETY.hotMinTemp ? 'PASS' : 'FAIL';
+  temp: number,
+  foodType: 'hot' | 'cold' | 'reheat' | 'fridge'
+): 'PASS' | 'FAIL' {
+  switch (foodType) {
+    case 'hot':     return temp >= FOOD_SAFETY.hotMinTemp ? 'PASS' : 'FAIL';
+    case 'reheat':  return temp >= FOOD_SAFETY.reheatMinTemp ? 'PASS' : 'FAIL';
+    case 'cold':    return temp <= FOOD_SAFETY.coldMaxTemp ? 'PASS' : 'FAIL';
+    case 'fridge':  return temp <= FOOD_SAFETY.fridgeMaxTemp ? 'PASS' : 'FAIL';
   }
-  // cold_item, dairy, produce
-  return tempCelsius <= FOOD_SAFETY.coldMaxTemp ? 'PASS' : 'FAIL';
 }

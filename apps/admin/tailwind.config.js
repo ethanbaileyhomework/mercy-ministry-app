@@ -1,35 +1,45 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: [
+    path.join(__dirname, './index.html'),
+    path.join(__dirname, './src/**/*.{js,ts,jsx,tsx}'),
+  ],
   darkMode: 'class',
   theme: {
     extend: {
       colors: {
+        // Deep warm charcoal — near-black with subtle warmth, won't read as brown
         navy: {
-          DEFAULT: '#1B3A5C',
-          50: '#E8EDF2',
-          100: '#C5D3E3',
-          200: '#9AB3CD',
-          300: '#6F93B7',
-          400: '#4473A1',
-          500: '#1B3A5C',
-          600: '#163050',
-          700: '#112644',
-          800: '#0D1D38',
-          900: '#08132C',
+          DEFAULT: '#1C1917',
+          50:  '#F5F4F3',
+          100: '#E8E5E3',
+          200: '#C9C4C1',
+          300: '#A8A09C',
+          400: '#6B6460',
+          500: '#1C1917',
+          600: '#171412',
+          700: '#12100E',
+          800: '#0D0B09',
+          900: '#080605',
         },
+        // Warm amber — from the "Daily" lettering in the logo
         gold: {
-          DEFAULT: '#C9A84C',
-          50: '#FBF6E9',
-          100: '#F5E9C8',
-          200: '#EDD89F',
-          300: '#E5C776',
-          400: '#D4B45E',
-          500: '#C9A84C',
-          600: '#B59340',
-          700: '#9A7E35',
-          800: '#7F682A',
-          900: '#5C4D23',
+          DEFAULT: '#D4892A',
+          50:  '#FDF4E7',
+          100: '#FAE3C0',
+          200: '#F5CB8A',
+          300: '#EFB35A',
+          400: '#E09B40',
+          500: '#D4892A',
+          600: '#B87424',
+          700: '#9C601E',
+          800: '#804D18',
+          900: '#5C3810',
         },
       },
       fontFamily: {

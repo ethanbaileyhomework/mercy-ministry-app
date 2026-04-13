@@ -14,10 +14,14 @@ export function LoginPage() {
     setLoading(true);
 
     try {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
       if (authError) throw authError;
+      if (!data.session) throw new Error('No session returned. Please try again.');
+      // Auth listener in useAuth will pick up the session and render the dashboard
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed');
+      // Sign out any partial session to prevent auth listener from bypassing the login
+      await supabase.auth.signOut();
     } finally {
       setLoading(false);
     }

@@ -1,19 +1,16 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Calendar, Users, UserCheck, Thermometer,
-  Package, FileText, Megaphone, Heart, X,
+  LayoutDashboard, Thermometer, Clock, Users, AlertTriangle, Heart, X, FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/sessions', icon: Calendar, label: 'Sessions' },
-  { to: '/guests', icon: Users, label: 'Guests' },
   { to: '/food-safety', icon: Thermometer, label: 'Food Safety' },
-  { to: '/inventory', icon: Package, label: 'Inventory' },
-  { to: '/volunteers', icon: UserCheck, label: 'Volunteers' },
+  { to: '/history', icon: Clock, label: 'History' },
   { to: '/reports', icon: FileText, label: 'Reports' },
-  { to: '/announcements', icon: Megaphone, label: 'Announcements' },
+  { to: '/volunteers', icon: Users, label: 'Volunteers' },
+  { to: '/incidents', icon: AlertTriangle, label: 'Incidents' },
 ];
 
 interface SidebarProps {

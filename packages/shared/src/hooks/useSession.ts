@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Session } from '../types/database';
-import { getCurrentDateAEST } from '../utils/date';
+
 
 export function useActiveSession(supabase: SupabaseClient) {
   const [session, setSession] = useState<Session | null>(null);
@@ -12,13 +12,12 @@ export function useActiveSession(supabase: SupabaseClient) {
     async function fetchActiveSession() {
       try {
         setLoading(true);
-        const today = getCurrentDateAEST();
-
         // Look for an active session first, then a draft session for today
+        // Find any active/draft session — the unique constraint ensures
+        // there's at most one active session at a time, so no date filter needed.
         const { data, error: fetchError } = await supabase
           .from('sessions')
           .select('*')
-          .eq('session_date', today)
           .in('status', ['active', 'draft'])
           .order('created_at', { ascending: false })
           .limit(1)

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
-import type { AppRole } from '@mercy/shared';
+type AppRole = 'coordinator' | 'leader' | 'read_only';
 import { supabase } from '@/lib/supabase';
 
 interface AuthState {

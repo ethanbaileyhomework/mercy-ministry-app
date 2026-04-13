@@ -8,7 +8,7 @@ interface SuccessScreenProps {
   returnDelay?: number;
 }
 
-export function SuccessScreen({ title, subtitle, returnDelay = 4000 }: SuccessScreenProps) {
+export function SuccessScreen({ title, subtitle, returnDelay = 3000 }: SuccessScreenProps) {
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -27,6 +27,7 @@ export function SuccessScreen({ title, subtitle, returnDelay = 4000 }: SuccessSc
       {subtitle && (
         <p className="text-kiosk-lg text-white/70">{subtitle}</p>
       )}
+      <p className="text-sm text-white/40 mt-8">Returning to home screen...</p>
     </div>
   );
 }
