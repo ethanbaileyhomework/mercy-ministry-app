@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { SessionReport } from '@/components/SessionReport';
 
-type AttendanceRow = VolunteerAttendance & { volunteers: { first_name: string; last_name: string } };
+type AttendanceRow = VolunteerAttendance & { volunteers: { first_name: string; last_name: string } | null };
 type FoodLogRow = FoodSafetyLog & { volunteers: { first_name: string; last_name: string } | null };
 type IncidentRow = Incident & { volunteers: { first_name: string; last_name: string } | null };
 
@@ -356,7 +356,7 @@ export function HistoryPage() {
                               {detail.attendance.map((a) => (
                                 <div key={a.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2 text-sm">
                                   <span>
-                                    {a.volunteers.first_name} {a.volunteers.last_name}
+                                    {a.volunteers?.first_name ?? 'Unknown'} {a.volunteers?.last_name ?? ''}
                                     <span className={`ml-2 text-xs ${a.area_on_day === 'kitchen' ? 'text-red-500' : 'text-blue-500'}`}>
                                       {a.area_on_day === 'kitchen' ? 'Kitchen' : 'Hall'}
                                     </span>

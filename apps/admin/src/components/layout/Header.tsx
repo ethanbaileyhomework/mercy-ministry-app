@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Menu, Moon, Sun, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useDarkMode } from '@/hooks/useDarkMode';
-import { getCurrentTimeAEST, type Session } from '@mercy/shared';
+import { getCurrentTimeAEST, getCurrentDayLabelAEST, type Session } from '@mercy/shared';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -43,7 +43,7 @@ export function Header({ onMenuClick, session }: HeaderProps) {
             ) : (
               <span className="text-sm text-gray-400">No session today</span>
             )}
-            <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">{time}</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500 hidden sm:block">{getCurrentDayLabelAEST()} · {time}</span>
           </div>
         </div>
 

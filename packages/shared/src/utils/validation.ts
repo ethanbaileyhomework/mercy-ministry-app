@@ -4,7 +4,7 @@ export const volunteerSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().min(1, 'Last name is required'),
   pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
-  area: z.enum(['kitchen', 'serving', 'cleanup', 'admin', 'other']),
+  area: z.enum(['kitchen', 'hall']),
   is_leader: z.boolean().default(false),
 });
 

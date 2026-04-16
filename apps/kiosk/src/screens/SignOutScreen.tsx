@@ -120,11 +120,18 @@ export function SignOutScreen() {
 
   const handleEndSession = async (shouldEnd: boolean) => {
     if (shouldEnd && session) {
-      await supabase
-        .from('sessions')
-        .update({ status: 'completed', ended_at: new Date().toISOString() })
-        .eq('id', session.id);
-      setSession({ ...session, status: 'completed', ended_at: new Date().toISOString() });
+      try {
+        const { error: endError } = await supabase
+          .from('sessions')
+          .update({ status: 'completed', ended_at: new Date().toISOString() })
+          .eq('id', session.id);
+        if (endError) throw endError;
+        setSession({ ...session, status: 'completed', ended_at: new Date().toISOString() });
+      } catch (err) {
+        console.error('Failed to end session:', err);
+        setError('Failed to end session. Please try again or ask the coordinator.');
+        return;
+      }
     }
     setStep('success');
   };

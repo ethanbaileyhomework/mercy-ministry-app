@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Thermometer, AlertTriangle, Power, Clock, Minus, Plus, Crown, LogOut, Sparkles } from 'lucide-react';
 import { useActiveSession, formatTimeAEST, getCurrentDateAEST, getCurrentDayLabelAEST, useSessionUpdates, type Session, type VolunteerAttendance } from '@mercy/shared';
@@ -32,7 +32,9 @@ export function DashboardPage() {
       .then(async ({ data }) => {
         if (!data) return;
         setLastCompleted(data as Session);
-        // Self-healing: if the last completed session has no report, auto-generate it
+        // Self-healing: if the last completed session has no report, auto-generate it (once only)
+        if (hasCheckedReport.current) return;
+        hasCheckedReport.current = true;
         const { data: report } = await supabase
           .from('session_reports')
           .select('id')
@@ -194,7 +196,7 @@ export function DashboardPage() {
       setElapsed(h > 0 ? `${h}h ${m}m` : `${m}m`);
     };
     tick();
-    const id = setInterval(tick, 60_000);
+    const id = setInterval(tick, 10_000);
     return () => clearInterval(id);
   }, [session?.started_at, session?.status]);
 
@@ -203,8 +205,12 @@ export function DashboardPage() {
 
   const [reportData, setReportData] = useState<any | null>(null);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const generatingRef = useRef(false);
+  const hasCheckedReport = useRef(false);
 
   const generateReport = async (sessionId: string) => {
+    if (generatingRef.current) return; // prevent parallel calls
+    generatingRef.current = true;
     const MAX_ATTEMPTS = 3;
     setGeneratingReport(true);
     toast.info('Generating AI report…');
@@ -222,6 +228,7 @@ export function DashboardPage() {
         setReportData(data);
         toast.success('Report generated');
         setGeneratingReport(false);
+        generatingRef.current = false;
         return;
       } catch (err: any) {
         if (attempt < MAX_ATTEMPTS) {
@@ -242,6 +249,7 @@ export function DashboardPage() {
       }
     }
     setGeneratingReport(false);
+    generatingRef.current = false;
   };
 
   // Whichever session to display on the completed/idle screen
