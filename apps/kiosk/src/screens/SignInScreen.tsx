@@ -131,27 +131,22 @@ export function SignInScreen() {
     setSubmitting(true);
 
     try {
-      // Ensure session exists (leader auto-creates)
-      const currentSession = await ensureSession();
-      if (!currentSession) {
-        setError('Could not start session. Please try again.');
-        setSubmitting(false);
-        return;
-      }
+      // Only check for duplicate sign-in if a session already exists — don't create one yet.
+      // Session creation is deferred to handleAreaSelect so backing out doesn't leave a ghost session.
+      if (session && session.status !== 'completed') {
+        const { data: existing } = await supabase
+          .from('volunteer_attendance')
+          .select('id')
+          .eq('session_id', session.id)
+          .eq('volunteer_id', vol.id)
+          .is('sign_out_time', null)
+          .limit(1);
 
-      // Check if already signed in
-      const { data: existing } = await supabase
-        .from('volunteer_attendance')
-        .select('id')
-        .eq('session_id', currentSession.id)
-        .eq('volunteer_id', vol.id)
-        .is('sign_out_time', null)
-        .limit(1);
-
-      if (existing && existing.length > 0) {
-        setError(`${vol.first_name}, you're already signed in!`);
-        setSubmitting(false);
-        return;
+        if (existing && existing.length > 0) {
+          setError(`${vol.first_name}, you're already signed in!`);
+          setSubmitting(false);
+          return;
+        }
       }
 
       setVolunteer(vol);
@@ -162,14 +157,15 @@ export function SignInScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [ensureSession]);
+  }, [session]);
 
   const handleAreaSelect = useCallback(async (area: 'kitchen' | 'hall') => {
     if (!volunteer) return;
     setSubmitting(true);
 
     try {
-      const currentSession = session || (await ensureSession());
+      // Session is created HERE — only once the volunteer has confirmed identity and chosen area.
+      const currentSession = await ensureSession();
       if (!currentSession) throw new Error('No session');
 
       const { error: insertError } = await supabase.from('volunteer_attendance').insert({
