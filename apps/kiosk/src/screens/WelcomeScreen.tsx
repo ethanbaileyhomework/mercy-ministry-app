@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, LogIn, LogOut, ClipboardList, Users, Lock } from 'lucide-react';
-import { getCurrentDayLabelAEST, useActiveSession, getNextTuesday, formatDateAEST } from '@mercy/shared';
+import { getCurrentDayLabelAEST, useActiveSession, getNextTuesday, formatDateAEST, isTuesday } from '@mercy/shared';
 import { supabase } from '@/lib/supabase';
 import { useCoordinator } from '@/context/CoordinatorContext';
 
@@ -33,11 +33,12 @@ export function WelcomeScreen() {
     return () => clearInterval(interval);
   }, [loadCount]);
 
+  const isServiceDay = isTuesday();
   const sessionLabel = session?.status === 'active'
     ? 'Session Open'
     : session?.status === 'draft'
       ? 'Session Starting Soon'
-      : 'No Active Session';
+      : isServiceDay ? 'Waiting for coordinator to start' : 'No Service Today';
 
   return (
     <div className="flex flex-col items-center justify-between h-full px-8 py-12">
@@ -80,46 +81,60 @@ export function WelcomeScreen() {
 
       {/* Action Buttons */}
       <div className="w-full max-w-lg space-y-5">
-        <button
-          onClick={() => navigate('/sign-in')}
-          className="kiosk-button-primary w-full flex items-center justify-center gap-4"
-        >
-          <LogIn size={32} />
-          Sign In
-        </button>
-
-        <button
-          onClick={() => navigate('/sign-out')}
-          className="kiosk-button-outline w-full flex items-center justify-center gap-4"
-        >
-          <LogOut size={32} />
-          Sign Out
-        </button>
-
-        {/* Service sheets — always visible when a session is active */}
-        {session?.status === 'active' && (
-          <div className="grid grid-cols-2 gap-4">
-            <button
-              onClick={() => navigate('/service-sheet/kitchen')}
-              className="kiosk-button-secondary flex items-center justify-center gap-3"
-            >
-              <ClipboardList size={24} />
-              <span>
-                <span className="block text-sm font-normal opacity-70">Service Sheet</span>
-                Kitchen
-              </span>
-            </button>
-            <button
-              onClick={() => navigate('/service-sheet/hall')}
-              className="kiosk-button-secondary flex items-center justify-center gap-3"
-            >
-              <ClipboardList size={24} />
-              <span>
-                <span className="block text-sm font-normal opacity-70">Service Sheet</span>
-                Hall
-              </span>
-            </button>
+        {!isServiceDay ? (
+          <div className="text-center py-6 space-y-2">
+            <p className="text-kiosk-lg text-white/40">Service is every Tuesday evening.</p>
+            <p className="text-kiosk-body text-white/30">
+              Next service: {formatDateAEST(getNextTuesday() + 'T00:00:00Z').replace(/\s\d{4}$/, '')}
+            </p>
           </div>
+        ) : session?.status !== 'active' ? (
+          <div className="text-center py-6">
+            <p className="text-kiosk-lg text-white/40">Waiting for tonight&apos;s session to open.</p>
+            <p className="text-kiosk-body text-white/30 mt-1">A coordinator will start it shortly.</p>
+          </div>
+        ) : (
+          <>
+            <button
+              onClick={() => navigate('/sign-in')}
+              className="kiosk-button-primary w-full flex items-center justify-center gap-4"
+            >
+              <LogIn size={32} />
+              Sign In
+            </button>
+
+            <button
+              onClick={() => navigate('/sign-out')}
+              className="kiosk-button-outline w-full flex items-center justify-center gap-4"
+            >
+              <LogOut size={32} />
+              Sign Out
+            </button>
+
+            {/* Service sheets — only when session is active */}
+            <div className="grid grid-cols-2 gap-4">
+              <button
+                onClick={() => navigate('/service-sheet/kitchen')}
+                className="kiosk-button-secondary flex items-center justify-center gap-3"
+              >
+                <ClipboardList size={24} />
+                <span>
+                  <span className="block text-sm font-normal opacity-70">Service Sheet</span>
+                  Kitchen
+                </span>
+              </button>
+              <button
+                onClick={() => navigate('/service-sheet/hall')}
+                className="kiosk-button-secondary flex items-center justify-center gap-3"
+              >
+                <ClipboardList size={24} />
+                <span>
+                  <span className="block text-sm font-normal opacity-70">Service Sheet</span>
+                  Hall
+                </span>
+              </button>
+            </div>
+          </>
         )}
       </div>
     </div>
