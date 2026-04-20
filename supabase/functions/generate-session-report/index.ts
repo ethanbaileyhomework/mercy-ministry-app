@@ -156,17 +156,19 @@ Deno.serve(async (req) => {
 
     // ── Optional Google Drive upload ─────────────────────────────
     let googleDriveUrl: string | null = null
-    const serviceAccountJson = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_JSON')
+    const oauthClientId = Deno.env.get('GOOGLE_OAUTH_CLIENT_ID')
+    const oauthClientSecret = Deno.env.get('GOOGLE_OAUTH_CLIENT_SECRET')
+    const oauthRefreshToken = Deno.env.get('GOOGLE_OAUTH_REFRESH_TOKEN')
     const driveFolderId = Deno.env.get('GOOGLE_DRIVE_FOLDER_ID')
 
-    if (serviceAccountJson && driveFolderId && savedReport) {
+    if (oauthClientId && oauthClientSecret && oauthRefreshToken && driveFolderId && savedReport) {
       try {
-        const serviceDate = new Date(session.session_date + 'T00:00:00').toLocaleDateString('en-AU', {
+        const reportServiceDate = new Date(session.session_date + 'T00:00:00').toLocaleDateString('en-AU', {
           weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
         })
-        const htmlContent = buildReportHTML({ session, serviceDate, aiSections, attendance, foodLogs, passChecks, failChecks, durationStr, kitchenVols, hallVols, totalHours: Math.round(totalHours * 10) / 10 })
+        const htmlContent = buildReportHTML({ session, serviceDate: reportServiceDate, aiSections, attendance, foodLogs, passChecks, failChecks, durationStr, kitchenVols, hallVols, totalHours: Math.round(totalHours * 10) / 10 })
         const fileName = `Mercy Ministry - ${session.session_date}.html`
-        const { fileId, webViewLink } = await uploadToDrive(serviceAccountJson, driveFolderId, fileName, htmlContent)
+        const { fileId, webViewLink } = await uploadToDriveOAuth(oauthClientId, oauthClientSecret, oauthRefreshToken, driveFolderId, fileName, htmlContent)
         googleDriveUrl = webViewLink
         await supabase
           .from('session_reports')
@@ -266,13 +268,29 @@ function buildFallbackSections(
   }
 }
 
-// ── Google Drive upload ──────────────────────────────────────────
+// ── Google Drive upload (OAuth refresh token) ────────────────────
 
-async function uploadToDrive(
-  serviceAccountJsonStr: string, folderId: string, fileName: string, htmlContent: string
+async function getOAuthAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string> {
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  })
+  const data = await res.json()
+  if (!data.access_token) throw new Error(`OAuth refresh failed: ${JSON.stringify(data)}`)
+  return data.access_token
+}
+
+async function uploadToDriveOAuth(
+  clientId: string, clientSecret: string, refreshToken: string,
+  folderId: string, fileName: string, htmlContent: string
 ): Promise<{ fileId: string; webViewLink: string }> {
-  const sa = JSON.parse(serviceAccountJsonStr)
-  const accessToken = await getServiceAccountToken(sa)
+  const accessToken = await getOAuthAccessToken(clientId, clientSecret, refreshToken)
   const metadata = { name: fileName, parents: [folderId], mimeType: 'text/html' }
   const boundary = 'mercy_ministry_boundary'
   const CRLF = '\r\n'
@@ -285,43 +303,16 @@ async function uploadToDrive(
     'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',
     {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': `multipart/related; boundary=${boundary}` },
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
       body,
     }
   )
   if (!res.ok) throw new Error(`Drive API ${res.status}: ${await res.text()}`)
   const data = await res.json()
   return { fileId: data.id, webViewLink: data.webViewLink }
-}
-
-async function getServiceAccountToken(sa: any): Promise<string> {
-  const now = Math.floor(Date.now() / 1000)
-  const jwt = await signJWT(
-    { alg: 'RS256', typ: 'JWT' },
-    { iss: sa.client_email, scope: 'https://www.googleapis.com/auth/drive.file', aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now },
-    sa.private_key
-  )
-  const res = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
-  })
-  const data = await res.json()
-  if (!data.access_token) throw new Error(`OAuth failed: ${JSON.stringify(data)}`)
-  return data.access_token
-}
-
-async function signJWT(header: object, payload: object, privateKeyPem: string): Promise<string> {
-  const toB64url = (obj: object) =>
-    btoa(JSON.stringify(obj)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-  const signingInput = `${toB64url(header)}.${toB64url(payload)}`
-  const pem = privateKeyPem.replace(/\\n/g, '\n')
-  const pemBody = pem.replace(/-----BEGIN PRIVATE KEY-----/, '').replace(/-----END PRIVATE KEY-----/, '').replace(/\s/g, '')
-  const binaryKey = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0))
-  const key = await crypto.subtle.importKey('pkcs8', binaryKey.buffer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign'])
-  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', key, new TextEncoder().encode(signingInput))
-  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
-  return `${signingInput}.${sigB64}`
 }
 
 // ── HTML report builder ──────────────────────────────────────────
