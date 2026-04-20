@@ -4,7 +4,7 @@
 
 export type Area = 'kitchen' | 'hall';
 export type SessionStatus = 'draft' | 'active' | 'completed';
-export type FoodType = 'hot' | 'cold' | 'reheat' | 'fridge';
+export type FoodType = 'hot' | 'cold' | 'reheat' | 'fridge' | 'frozen';
 export type FoodResult = 'PASS' | 'FAIL';
 export type Severity = 'low' | 'medium' | 'high';
 

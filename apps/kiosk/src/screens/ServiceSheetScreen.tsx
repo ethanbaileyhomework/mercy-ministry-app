@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ClipboardList, Thermometer, AlertTriangle, FileText, Home,
-  Plus, Minus, CheckCircle, XCircle, LogOut, Users, Crown, Lock,
+  Plus, Minus, CheckCircle, LogOut, Users, Crown, Lock,
 } from 'lucide-react';
 import {
   useActiveSession,
@@ -337,169 +337,328 @@ function HallServiceTab({ session, setSession }: { session: Session; setSession:
 }
 
 // ─── TEMPS TAB (Kitchen only) ─────────────────────────────
+
+const CHECK_IDS = ['start', '1hr', 'end'] as const;
+type CheckId = (typeof CHECK_IDS)[number];
+
+const CHECKS: { id: CheckId; label: string; sublabel: string; cold: boolean }[] = [
+  { id: 'start', label: 'Start of Service', sublabel: 'Before guests arrive — all equipment', cold: true },
+  { id: '1hr',   label: '1-Hour Check',     sublabel: 'Hot equipment only',                  cold: false },
+  { id: 'end',   label: 'End of Service',   sublabel: 'Before packing down — all equipment', cold: true },
+];
+
+const HOT_EQUIP = [
+  { key: 'pw', label: 'Pie Warmer', emoji: '🥧', foodType: 'hot' as const },
+  { key: 'bm', label: 'Bain Marie', emoji: '🍲', foodType: 'hot' as const },
+];
+
+const COLD_EQUIP = [
+  { key: 'fridge',  label: 'Fridge',        emoji: '🧊', foodType: 'fridge'  as const, threshold: '≤ 5°C'   },
+  { key: 'freezer', label: 'Chest Freezer', emoji: '❄️', foodType: 'frozen'  as const, threshold: '≤ −15°C' },
+];
+
 function TempsTab({ session }: { session: Session }) {
-  const [logs, setLogs] = useState<(FoodSafetyLog & { volunteers?: { first_name: string } | null })[]>([]);
-  const [foodItem, setFoodItem] = useState('');
-  const [foodType, setFoodType] = useState<'hot' | 'cold' | 'reheat' | 'fridge' | ''>('');
-  const [tempStr, setTempStr] = useState('');
-  const [probeId, setProbeId] = useState('');
-  const [correctiveAction, setCorrectiveAction] = useState('');
-  const [saving, setSaving] = useState(false);
+  const slotKey = `mercy-slots-${session.id}`;
 
-  const temp = tempStr ? parseFloat(tempStr) : null;
-  const preview = temp !== null && !isNaN(temp) && foodType
-    ? evaluateTemperature(temp, foodType)
-    : null;
+  const [slotLabels, setSlotLabels] = useState<Record<string, string[]>>(() => {
+    try {
+      const saved = localStorage.getItem(slotKey);
+      return saved ? JSON.parse(saved) : { pw: ['', '', '', ''], bm: ['', '', '', ''] };
+    } catch { return { pw: ['', '', '', ''], bm: ['', '', '', ''] }; }
+  });
 
-  const loadLogs = useCallback(async () => {
-    const { data } = await supabase
+  // Flat maps keyed by `${checkId}:${equipKey}:${slotIndex}`
+  const [temps, setTemps] = useState<Record<string, string>>({});
+  const [corrections, setCorrections] = useState<Record<string, string>>({});
+  const [completed, setCompleted] = useState<Set<CheckId>>(new Set());
+  const [saving, setSaving] = useState<CheckId | null>(null);
+  const [existingLogs, setExistingLogs] = useState<FoodSafetyLog[]>([]);
+
+  useEffect(() => {
+    supabase
       .from('food_safety_logs')
-      .select('*, volunteers(first_name)')
+      .select('*')
       .eq('session_id', session.id)
-      .order('logged_at', { ascending: false });
-    if (data) setLogs(data as typeof logs);
+      .order('logged_at')
+      .then(({ data }) => {
+        if (!data) return;
+        setExistingLogs(data as FoodSafetyLog[]);
+        const done = new Set<CheckId>();
+        for (const id of CHECK_IDS) {
+          if (data.some((l) => l.probe_id === `check:${id}`)) done.add(id);
+        }
+        setCompleted(done);
+      });
   }, [session.id]);
 
-  useEffect(() => { loadLogs(); }, [loadLogs]);
+  const getT = (cid: CheckId, eq: string, slot: number | string) => temps[`${cid}:${eq}:${slot}`] ?? '';
+  const setT = (cid: CheckId, eq: string, slot: number | string, v: string) =>
+    setTemps((p) => ({ ...p, [`${cid}:${eq}:${slot}`]: v }));
+  const getC = (cid: CheckId, eq: string, slot: number | string) => corrections[`${cid}:${eq}:${slot}`] ?? '';
+  const setC = (cid: CheckId, eq: string, slot: number | string, v: string) =>
+    setCorrections((p) => ({ ...p, [`${cid}:${eq}:${slot}`]: v }));
 
-  const resetForm = () => {
-    setFoodItem(''); setFoodType(''); setTempStr(''); setProbeId(''); setCorrectiveAction('');
+  const updateSlotLabel = (equipKey: string, idx: number, val: string) => {
+    const next = { ...slotLabels, [equipKey]: slotLabels[equipKey].map((s, i) => (i === idx ? val : s)) };
+    setSlotLabels(next);
+    try { localStorage.setItem(slotKey, JSON.stringify(next)); } catch { /* ignore */ }
   };
 
-  const handleSave = async () => {
-    if (!foodType || temp === null || !foodItem.trim()) return;
-    const result = evaluateTemperature(temp, foodType);
-    if (result === 'FAIL' && !correctiveAction.trim()) return;
+  const handleSave = async (checkId: CheckId, includesCold: boolean) => {
+    setSaving(checkId);
+    const now = new Date().toISOString();
+    const rows: object[] = [];
 
-    setSaving(true);
-    await supabase.from('food_safety_logs').insert({
-      session_id: session.id,
-      food_item: foodItem.trim(),
-      food_type: foodType,
-      temp_celsius: temp,
-      result,
-      corrective_action: result === 'FAIL' ? correctiveAction.trim() : null,
-      probe_id: probeId.trim() || null,
-      logged_at: new Date().toISOString(),
-    });
-    resetForm();
-    loadLogs();
-    setSaving(false);
+    for (const equip of HOT_EQUIP) {
+      for (let i = 0; i < 4; i++) {
+        const tv = getT(checkId, equip.key, i);
+        if (!tv) continue;
+        const t = parseFloat(tv);
+        if (isNaN(t)) continue;
+        const result = evaluateTemperature(t, equip.foodType);
+        const corrective = getC(checkId, equip.key, i).trim();
+        if (result === 'FAIL' && !corrective) continue;
+        rows.push({
+          session_id: session.id,
+          food_item: `${equip.label} – ${slotLabels[equip.key][i] || `Slot ${i + 1}`}`,
+          food_type: equip.foodType,
+          temp_celsius: t,
+          result,
+          corrective_action: result === 'FAIL' ? corrective : null,
+          probe_id: `check:${checkId}`,
+          logged_at: now,
+        });
+      }
+    }
+
+    if (includesCold) {
+      for (const cold of COLD_EQUIP) {
+        const tv = getT(checkId, cold.key, 0);
+        if (!tv) continue;
+        const t = parseFloat(tv);
+        if (isNaN(t)) continue;
+        const result = evaluateTemperature(t, cold.foodType);
+        const corrective = getC(checkId, cold.key, 0).trim();
+        if (result === 'FAIL' && !corrective) continue;
+        rows.push({
+          session_id: session.id,
+          food_item: cold.label,
+          food_type: cold.foodType,
+          temp_celsius: t,
+          result,
+          corrective_action: result === 'FAIL' ? corrective : null,
+          probe_id: `check:${checkId}`,
+          logged_at: now,
+        });
+      }
+    }
+
+    if (rows.length > 0) {
+      await supabase.from('food_safety_logs').insert(rows);
+      setExistingLogs((prev) => [
+        ...prev,
+        ...(rows as FoodSafetyLog[]),
+      ]);
+    }
+    setCompleted((prev) => new Set([...prev, checkId]));
+    setSaving(null);
   };
 
-  const typeButtons: { value: 'hot' | 'cold' | 'reheat' | 'fridge'; label: string; active: string }[] = [
-    { value: 'hot', label: "Hot \u2265 60\u00B0C", active: 'bg-red-500' },
-    { value: 'cold', label: "Cold Hold \u2264 5\u00B0C", active: 'bg-blue-500' },
-    { value: 'reheat', label: "Reheat \u2265 75\u00B0C", active: 'bg-orange-500' },
-    { value: 'fridge', label: "Fridge \u2264 5\u00B0C", active: 'bg-cyan-600' },
-  ];
+  const activeCheck = CHECK_IDS.find((id) => !completed.has(id)) ?? 'end';
 
   return (
-    <div className="space-y-5">
-      <h2 className="text-kiosk-lg font-bold flex items-center gap-2">
-        <Thermometer size={24} className="text-gold" /> Temperature Log
-      </h2>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-kiosk-lg font-bold flex items-center gap-2">
+          <Thermometer size={22} className="text-gold" /> Temp Checks
+        </h2>
+        <span className="text-xs text-white/30">
+          {completed.size}/3 complete
+        </span>
+      </div>
+      <p className="text-xs text-white/30">
+        Hot equipment: 3 checks · Fridge &amp; freezer: start &amp; end only
+      </p>
 
-      <div className="grid grid-cols-4 gap-2">
-        {typeButtons.map((t) => (
-          <button
-            key={t.value}
-            onClick={() => setFoodType(t.value)}
-            className={`py-3 rounded-xl text-sm font-bold transition-all active:scale-95 ${
-              foodType === t.value
-                ? `${t.active} text-white shadow-lg`
-                : 'bg-white/5 border border-white/10 text-white/50'
+      {CHECKS.map(({ id, label, sublabel, cold: includesCold }) => {
+        const isDone = completed.has(id);
+        const isActive = !isDone && id === activeCheck;
+        const checkLogs = existingLogs.filter((l) => l.probe_id === `check:${id}`);
+        const failCount = checkLogs.filter((l) => l.result === 'FAIL').length;
+
+        return (
+          <div
+            key={id}
+            className={`rounded-2xl border transition-all ${
+              isDone
+                ? 'border-green-500/30 bg-green-500/5'
+                : isActive
+                  ? 'border-gold/40 bg-white/5'
+                  : 'border-white/10 bg-white/3 opacity-40'
             }`}
           >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <input
-          type="text"
-          value={foodItem}
-          onChange={(e) => setFoodItem(e.target.value)}
-          placeholder="Food item (e.g. Beef Stew)"
-          className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-kiosk-body text-white
-                     placeholder-white/30 focus:outline-none focus:border-gold/50"
-        />
-        <input
-          type="number"
-          step="0.1"
-          value={tempStr}
-          onChange={(e) => setTempStr(e.target.value)}
-          placeholder="Temp \u00B0C"
-          className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-kiosk-lg text-white text-center font-bold
-                     placeholder-white/30 focus:outline-none focus:border-gold/50"
-        />
-      </div>
-
-      <input
-        type="text"
-        value={probeId}
-        onChange={(e) => setProbeId(e.target.value)}
-        placeholder="Probe ID (optional, e.g. PROBE-01)"
-        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white
-                   placeholder-white/30 focus:outline-none focus:border-gold/50"
-      />
-
-      {preview && (
-        <div className={`flex items-center gap-3 p-4 rounded-xl text-kiosk-body font-bold ${
-          preview === 'PASS'
-            ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-            : 'bg-red-500/20 text-red-300 border border-red-500/30'
-        }`}>
-          {preview === 'PASS' ? <CheckCircle size={28} /> : <XCircle size={28} />}
-          {preview}
-        </div>
-      )}
-
-      {preview === 'FAIL' && (
-        <textarea
-          value={correctiveAction}
-          onChange={(e) => setCorrectiveAction(e.target.value)}
-          placeholder="Corrective action taken (REQUIRED for FAIL)..."
-          className="w-full bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3 text-kiosk-body text-white
-                     placeholder-red-300/50 focus:outline-none focus:border-red-400 min-h-[70px] resize-none"
-        />
-      )}
-
-      <button
-        onClick={handleSave}
-        disabled={!foodItem.trim() || !foodType || temp === null || saving || (preview === 'FAIL' && !correctiveAction.trim())}
-        className="w-full py-4 rounded-xl bg-gold text-navy text-kiosk-body font-bold
-                   active:scale-95 transition-all disabled:opacity-30 disabled:active:scale-100"
-      >
-        {saving ? 'Saving...' : 'Save Temperature Check'}
-      </button>
-
-      {logs.length > 0 && (
-        <div className="space-y-2">
-          <h3 className="text-sm text-white/40 font-medium mt-2">Today&apos;s Logs ({logs.length})</h3>
-          {logs.map((log) => (
-            <div key={log.id} className="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
-              <div className="flex items-center gap-3">
-                <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                  { hot: 'bg-red-500/30 text-red-300', cold: 'bg-blue-500/30 text-blue-300',
-                    reheat: 'bg-orange-500/30 text-orange-300', fridge: 'bg-cyan-500/30 text-cyan-300' }[log.food_type]
-                }`}>
-                  {{ hot: 'HOT', cold: 'COLD', reheat: 'REHEAT', fridge: 'FRIDGE' }[log.food_type]}
-                </span>
-                <span className="text-sm font-medium">{log.food_item}</span>
-                <span className="text-sm text-white/40 font-mono">{log.temp_celsius}{"\u00B0C"}</span>
+            {/* Section header */}
+            <div className="flex items-center justify-between px-5 py-4">
+              <div>
+                <div className="flex items-center gap-2.5">
+                  {isDone
+                    ? <CheckCircle size={20} className="text-green-400 flex-shrink-0" />
+                    : isActive
+                      ? <div className="w-5 h-5 rounded-full border-2 border-gold animate-pulse flex-shrink-0" />
+                      : <div className="w-5 h-5 rounded-full border-2 border-white/20 flex-shrink-0" />
+                  }
+                  <span className={`font-bold text-kiosk-body ${isDone ? 'text-green-300' : isActive ? 'text-white' : 'text-white/40'}`}>
+                    {label}
+                  </span>
+                </div>
+                <p className="text-xs text-white/30 mt-0.5 ml-7">{sublabel}</p>
               </div>
-              <div className="flex items-center gap-2">
-                {log.result === 'PASS'
-                  ? <CheckCircle size={18} className="text-green-400" />
-                  : <XCircle size={18} className="text-red-400" />}
-                <span className="text-xs text-white/30">{formatTimeAEST(log.logged_at)}</span>
-              </div>
+              {isDone && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-green-400 font-medium">{checkLogs.length} saved</span>
+                  {failCount > 0 && (
+                    <span className="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded font-bold">
+                      {failCount} FAIL
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+
+            {/* Expanded form */}
+            {isActive && (
+              <div className="px-5 pb-5 space-y-6">
+                <p className="text-xs text-white/30 italic -mt-2">
+                  Tap a slot name to label it (e.g. &quot;Beef Pies&quot;) — saves for tonight
+                </p>
+
+                {/* Hot equipment */}
+                {HOT_EQUIP.map((equip) => (
+                  <div key={equip.key}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xl">{equip.emoji}</span>
+                      <span className="font-bold text-white">{equip.label}</span>
+                      <span className="text-xs text-red-300 bg-red-500/10 px-2 py-0.5 rounded ml-auto">≥ 60°C</span>
+                    </div>
+                    <div className="space-y-2">
+                      {[0, 1, 2, 3].map((i) => {
+                        const tv = getT(id, equip.key, i);
+                        const parsed = parseFloat(tv);
+                        const result = tv && !isNaN(parsed) ? evaluateTemperature(parsed, equip.foodType) : null;
+                        return (
+                          <div key={i} className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={slotLabels[equip.key][i]}
+                                onChange={(e) => updateSlotLabel(equip.key, i, e.target.value)}
+                                placeholder={`Slot ${i + 1}`}
+                                className="flex-1 min-w-0 bg-white/5 border border-white/10 rounded-xl px-3 py-2.5
+                                           text-sm text-white placeholder-white/25 focus:outline-none focus:border-white/30"
+                              />
+                              <input
+                                type="number"
+                                step="0.1"
+                                inputMode="decimal"
+                                value={tv}
+                                onChange={(e) => setT(id, equip.key, i, e.target.value)}
+                                placeholder="°C"
+                                className="w-[90px] bg-white/5 border border-white/10 rounded-xl px-3 py-2.5
+                                           text-center font-bold text-white placeholder-white/25
+                                           focus:outline-none focus:border-gold/50"
+                              />
+                              {result && (
+                                <span className={`w-14 text-center text-xs font-bold py-2.5 rounded-lg flex-shrink-0 ${
+                                  result === 'PASS' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
+                                }`}>
+                                  {result}
+                                </span>
+                              )}
+                            </div>
+                            {result === 'FAIL' && (
+                              <input
+                                type="text"
+                                value={getC(id, equip.key, i)}
+                                onChange={(e) => setC(id, equip.key, i, e.target.value)}
+                                placeholder="Corrective action taken (required for FAIL)..."
+                                className="w-full bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2.5
+                                           text-sm text-white placeholder-red-300/40 focus:outline-none focus:border-red-400"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Cold storage */}
+                {includesCold && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xl">🌡️</span>
+                      <span className="font-bold text-white">Cold Storage</span>
+                    </div>
+                    <div className="space-y-2">
+                      {COLD_EQUIP.map((cold) => {
+                        const tv = getT(id, cold.key, 0);
+                        const parsed = parseFloat(tv);
+                        const result = tv && !isNaN(parsed) ? evaluateTemperature(parsed, cold.foodType) : null;
+                        return (
+                          <div key={cold.key} className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{cold.emoji}</span>
+                              <span className="flex-1 text-sm text-white/80 font-medium">{cold.label}</span>
+                              <span className="text-xs text-blue-300 bg-blue-500/10 px-2 py-0.5 rounded">{cold.threshold}</span>
+                              <input
+                                type="number"
+                                step="0.1"
+                                inputMode="decimal"
+                                value={tv}
+                                onChange={(e) => setT(id, cold.key, 0, e.target.value)}
+                                placeholder="°C"
+                                className="w-[90px] bg-white/5 border border-white/10 rounded-xl px-3 py-2.5
+                                           text-center font-bold text-white placeholder-white/25
+                                           focus:outline-none focus:border-gold/50"
+                              />
+                              {result && (
+                                <span className={`w-14 text-center text-xs font-bold py-2.5 rounded-lg flex-shrink-0 ${
+                                  result === 'PASS' ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
+                                }`}>
+                                  {result}
+                                </span>
+                              )}
+                            </div>
+                            {result === 'FAIL' && (
+                              <input
+                                type="text"
+                                value={getC(id, cold.key, 0)}
+                                onChange={(e) => setC(id, cold.key, 0, e.target.value)}
+                                placeholder="Corrective action taken (required for FAIL)..."
+                                className="w-full bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2.5
+                                           text-sm text-white placeholder-red-300/40 focus:outline-none focus:border-red-400"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => handleSave(id, includesCold)}
+                  disabled={saving === id}
+                  className="w-full py-4 rounded-xl bg-gold text-navy text-kiosk-body font-bold
+                             active:scale-95 transition-all disabled:opacity-50"
+                >
+                  {saving === id ? 'Saving...' : `Save ${label} ✓`}
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

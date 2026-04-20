@@ -10,16 +10,18 @@ export const FOOD_SAFETY = {
   coldMaxTemp: 5,
   reheatMinTemp: 75,
   fridgeMaxTemp: 5,
+  frozenMaxTemp: -15,
 } as const;
 
 export function evaluateTemperature(
   temp: number,
-  foodType: 'hot' | 'cold' | 'reheat' | 'fridge'
+  foodType: 'hot' | 'cold' | 'reheat' | 'fridge' | 'frozen'
 ): 'PASS' | 'FAIL' {
   switch (foodType) {
     case 'hot':     return temp >= FOOD_SAFETY.hotMinTemp ? 'PASS' : 'FAIL';
     case 'reheat':  return temp >= FOOD_SAFETY.reheatMinTemp ? 'PASS' : 'FAIL';
     case 'cold':    return temp <= FOOD_SAFETY.coldMaxTemp ? 'PASS' : 'FAIL';
     case 'fridge':  return temp <= FOOD_SAFETY.fridgeMaxTemp ? 'PASS' : 'FAIL';
+    case 'frozen':  return temp <= FOOD_SAFETY.frozenMaxTemp ? 'PASS' : 'FAIL';
   }
 }
