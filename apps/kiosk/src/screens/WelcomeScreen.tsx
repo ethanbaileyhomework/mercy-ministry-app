@@ -11,6 +11,7 @@ export function WelcomeScreen() {
   const { lock } = useCoordinator();
   const [dateLabel, setDateLabel] = useState(getCurrentDayLabelAEST());
   const [signedInCount, setSignedInCount] = useState(0);
+  const [forceMode, setForceMode] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => setDateLabel(getCurrentDayLabelAEST()), 60_000);
@@ -33,7 +34,7 @@ export function WelcomeScreen() {
     return () => clearInterval(interval);
   }, [loadCount]);
 
-  const isServiceDay = isTuesday();
+  const isServiceDay = forceMode || isTuesday();
   const sessionLabel = session?.status === 'active'
     ? 'Session Open'
     : session?.status === 'draft'
@@ -43,13 +44,25 @@ export function WelcomeScreen() {
   return (
     <div className="flex flex-col items-center justify-between h-full px-8 py-12">
       {/* Lock button — subtle, top-right */}
-      <button
-        onClick={lock}
-        className="absolute top-4 right-4 p-2.5 rounded-xl text-white/20 hover:bg-white/8 hover:text-white/40 transition-all active:scale-90"
-        title="Lock kiosk"
-      >
-        <Lock size={18} />
-      </button>
+      <div className="absolute top-4 right-4 flex gap-2">
+        {/* Dev: Force mode button — hold 3 seconds to toggle */}
+        <button
+          onClick={() => setForceMode(!forceMode)}
+          className={`p-2.5 rounded-xl transition-all active:scale-90 ${
+            forceMode ? 'text-gold/60 bg-gold/10' : 'text-white/20 hover:bg-white/8 hover:text-white/40'
+          }`}
+          title={`${forceMode ? 'Disable' : 'Enable'} dev mode`}
+        >
+          <span className="text-xs font-bold">DEV</span>
+        </button>
+        <button
+          onClick={lock}
+          className="p-2.5 rounded-xl text-white/20 hover:bg-white/8 hover:text-white/40 transition-all active:scale-90"
+          title="Lock kiosk"
+        >
+          <Lock size={18} />
+        </button>
+      </div>
 
       {/* Header */}
       <div className="text-center">

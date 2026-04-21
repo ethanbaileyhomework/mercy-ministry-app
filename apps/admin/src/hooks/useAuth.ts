@@ -13,14 +13,20 @@ export function useAuth(): AuthState & { signOut: () => Promise<void> } {
   const [state, setState] = useState<AuthState>({ user: null, role: null, loading: true });
 
   useEffect(() => {
-    // Get initial session
+    // Get initial session and validate it
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
+        // User exists, set the session
         const role = (session.user.app_metadata?.app_role as AppRole) || null;
         setState({ user: session.user, role, loading: false });
       } else {
+        // No valid session
         setState({ user: null, role: null, loading: false });
       }
+    }).catch((err) => {
+      console.error('Session check failed:', err);
+      // On error, assume no session to prevent lockout
+      setState({ user: null, role: null, loading: false });
     });
 
     // Listen for auth changes

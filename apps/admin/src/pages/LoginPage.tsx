@@ -8,6 +8,21 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const handleClearSession = async () => {
+    try {
+      // Sign out from all sessions
+      await supabase.auth.signOut({ scope: 'global' });
+      // Clear any cached auth data
+      localStorage.clear();
+      sessionStorage.clear();
+      setError('');
+      setEmail('');
+      setPassword('');
+    } catch (err) {
+      console.error('Failed to clear session:', err);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -76,6 +91,14 @@ export function LoginPage() {
             className="btn-gold w-full mt-6 py-3 disabled:opacity-50"
           >
             {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleClearSession}
+            className="text-xs text-white/40 hover:text-white/60 transition-colors mt-3 w-full py-2 text-center"
+          >
+            Having trouble? Clear cached session
           </button>
         </form>
 
