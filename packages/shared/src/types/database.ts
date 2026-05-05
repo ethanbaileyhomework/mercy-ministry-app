@@ -2,13 +2,14 @@ export interface Volunteer {
   id: string;
   first_name: string;
   last_name: string;
-  email: string | null;
+  pin: string;
   phone: string | null;
+  email: string | null;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
-  preferred_roles: VolunteerRole[];
+  area: string;
+  is_leader: boolean;
   is_active: boolean;
-  onboarded_date: string | null;
   wwcc_number: string | null;
   wwcc_expiry: string | null;
   notes: string | null;
@@ -114,6 +115,7 @@ export type VolunteerInsert = Omit<Volunteer, 'id' | 'created_at' | 'is_active'>
   is_active?: boolean;
 };
 
+
 export type SessionInsert = Omit<Session, 'id' | 'created_at' | 'total_guests_served' | 'total_meals_served' | 'total_grocery_packs'>;
 
 export type AttendanceInsert = Omit<VolunteerAttendance, 'id' | 'sign_out_time' | 'hours_calculated'>;
@@ -129,4 +131,4 @@ export type InventoryTransactionInsert = Omit<InventoryTransaction, 'id' | 'crea
 export type AnnouncementInsert = Omit<Announcement, 'id' | 'created_at' | 'is_active'>;
 
 // Import enums used above
-import type { VolunteerRole, SessionStatus, FoodCategory, FoodSafetyResult, InventoryCategory, InventoryUnit, TransactionType } from './enums';
+import type { SessionStatus, FoodCategory, FoodSafetyResult, InventoryCategory, InventoryUnit, TransactionType } from './enums';

@@ -32,7 +32,7 @@ export function SignOutScreen() {
     async function loadSignedIn() {
       const { data, error } = await supabase
         .from('volunteer_attendance')
-        .select('id, volunteer_id, role_on_day, sign_in_time, volunteers(first_name, last_name, preferred_roles, email, phone)')
+        .select('id, volunteer_id, role_on_day, sign_in_time, volunteers(first_name, last_name, area, email, phone)')
         .eq('session_id', session!.id)
         .is('sign_out_time', null);
 
@@ -51,13 +51,14 @@ export function SignOutScreen() {
           last_name: vol.last_name as string,
           role_on_day: a.role_on_day as string,
           sign_in_time: a.sign_in_time as string,
-          preferred_roles: vol.preferred_roles as string[],
+          area: vol.area as string,
           email: vol.email as string | null,
           phone: vol.phone as string | null,
+          pin: '',
+          is_leader: false,
           emergency_contact_name: null,
           emergency_contact_phone: null,
           is_active: true,
-          onboarded_date: null,
           wwcc_number: null,
           wwcc_expiry: null,
           notes: null,

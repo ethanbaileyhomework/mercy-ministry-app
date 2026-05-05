@@ -24,9 +24,8 @@ export function SignInScreen() {
 
   const handleSelectVolunteer = useCallback((volunteer: Volunteer) => {
     setSelectedVolunteer(volunteer);
-    // Pre-select first preferred role if any
-    if (volunteer.preferred_roles.length > 0) {
-      setSelectedRole(volunteer.preferred_roles[0] as VolunteerRole);
+    if (volunteer.area === 'kitchen') {
+      setSelectedRole('Kitchen');
     }
     setStep('role');
   }, []);
@@ -98,7 +97,7 @@ export function SignInScreen() {
                   key={v.id}
                   firstName={v.first_name}
                   lastName={v.last_name}
-                  subtitle={v.preferred_roles.length > 0 ? `Usually: ${v.preferred_roles.join(', ')}` : undefined}
+                  subtitle={v.area ? `Area: ${v.area.charAt(0).toUpperCase() + v.area.slice(1)}` : undefined}
                   onClick={() => handleSelectVolunteer(v)}
                 />
               ))
@@ -119,7 +118,7 @@ export function SignInScreen() {
                 key={role}
                 role={role}
                 selected={selectedRole === role}
-                suggested={selectedVolunteer.preferred_roles.includes(role)}
+                suggested={role === 'Kitchen' && selectedVolunteer.area === 'kitchen'}
                 onClick={() => setSelectedRole(role)}
               />
             ))}
