@@ -1,15 +1,40 @@
-import { useState, useEffect } from 'react';
-import { Search, UserCheck, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react';
-import { VOLUNTEER_ROLES, type Volunteer, formatDateAEST } from '@mercy/shared';
+import { useState, useEffect, useCallback } from 'react';
+import { Search, UserCheck, AlertTriangle, ChevronDown, ChevronUp, Plus, RefreshCw } from 'lucide-react';
+import { type Volunteer, formatDateAEST } from '@mercy/shared';
 import { supabase } from '@/lib/supabase';
+
+const AREAS = [
+  { value: 'hall', label: 'Hall' },
+  { value: 'kitchen', label: 'Kitchen' },
+];
+
+const BLANK_FORM = {
+  first_name: '',
+  last_name: '',
+  email: '',
+  phone: '',
+  area: 'hall',
+  is_leader: false,
+  emergency_contact_name: '',
+  emergency_contact_phone: '',
+  wwcc_number: '',
+  wwcc_expiry: '',
+  notes: '',
+  pin: '',
+};
 
 export function VolunteersPage() {
   const [volunteers, setVolunteers] = useState<Volunteer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  const [areaFilter, setAreaFilter] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, { total_hours: number; session_count: number }>>({});
+
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState(BLANK_FORM);
+  const [addError, setAddError] = useState('');
+  const [addSubmitting, setAddSubmitting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -20,7 +45,6 @@ export function VolunteersPage() {
         .order('first_name');
       if (data) setVolunteers(data as Volunteer[]);
 
-      // Get attendance summary
       const { data: att } = await supabase
         .from('volunteer_attendance')
         .select('volunteer_id, hours_calculated');
@@ -43,11 +67,10 @@ export function VolunteersPage() {
 
   const filtered = volunteers.filter((v) => {
     const matchesSearch = !search || `${v.first_name} ${v.last_name}`.toLowerCase().includes(search.toLowerCase());
-    const matchesRole = !roleFilter || v.preferred_roles.includes(roleFilter);
-    return matchesSearch && matchesRole;
+    const matchesArea = !areaFilter || v.area === areaFilter;
+    return matchesSearch && matchesArea;
   });
 
-  // WWCC expiring within 90 days
   const now = new Date();
   const ninetyDays = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
   const wwccAlerts = volunteers.filter((v) =>
@@ -60,12 +83,156 @@ export function VolunteersPage() {
     setVolunteers(volunteers.filter((v) => v.id !== vol.id));
   };
 
+  const generatePin = useCallback(() => {
+    const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    setForm((f) => ({ ...f, pin }));
+  }, []);
+
+  const handleAddVolunteer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError('');
+
+    if (!/^\d{4}$/.test(form.pin)) {
+      setAddError('PIN must be exactly 4 digits.');
+      return;
+    }
+
+    setAddSubmitting(true);
+    const { data, error } = await supabase
+      .from('volunteers')
+      .insert({
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        email: form.email.trim() || null,
+        phone: form.phone.trim() || null,
+        area: form.area,
+        is_leader: form.is_leader,
+        emergency_contact_name: form.emergency_contact_name.trim() || null,
+        emergency_contact_phone: form.emergency_contact_phone.trim() || null,
+        wwcc_number: form.wwcc_number.trim() || null,
+        wwcc_expiry: form.wwcc_expiry || null,
+        notes: form.notes.trim() || null,
+        pin: form.pin,
+      })
+      .select()
+      .single();
+
+    setAddSubmitting(false);
+
+    if (error) {
+      setAddError(error.message);
+      return;
+    }
+
+    setVolunteers((prev) => [...prev, data as Volunteer].sort((a, b) => a.first_name.localeCompare(b.first_name)));
+    setForm(BLANK_FORM);
+    setShowAdd(false);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Volunteer Management</h1>
-        <span className="text-sm text-gray-500">{volunteers.length} active volunteers</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{volunteers.length} active volunteers</span>
+          <button onClick={() => { setShowAdd(!showAdd); setAddError(''); setForm(BLANK_FORM); }} className="btn-primary">
+            <Plus size={18} /> Add Volunteer
+          </button>
+        </div>
       </div>
+
+      {/* Add Volunteer form */}
+      {showAdd && (
+        <form onSubmit={handleAddVolunteer} className="card p-6 space-y-4">
+          <h2 className="text-lg font-semibold">New Volunteer</h2>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="label">First Name *</label>
+              <input type="text" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} className="input" required autoComplete="off" />
+            </div>
+            <div>
+              <label className="label">Last Name *</label>
+              <input type="text" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} className="input" required autoComplete="off" />
+            </div>
+            <div>
+              <label className="label">Phone</label>
+              <input type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="input" autoComplete="off" />
+            </div>
+            <div>
+              <label className="label">Email</label>
+              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input" autoComplete="off" />
+            </div>
+            <div>
+              <label className="label">Area *</label>
+              <select value={form.area} onChange={(e) => setForm({ ...form, area: e.target.value })} className="input" required>
+                {AREAS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-3 pt-6">
+              <input
+                id="is_leader"
+                type="checkbox"
+                checked={form.is_leader}
+                onChange={(e) => setForm({ ...form, is_leader: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <label htmlFor="is_leader" className="text-sm font-medium">Leader</label>
+            </div>
+            <div>
+              <label className="label">Emergency Contact Name</label>
+              <input type="text" value={form.emergency_contact_name} onChange={(e) => setForm({ ...form, emergency_contact_name: e.target.value })} className="input" autoComplete="off" />
+            </div>
+            <div>
+              <label className="label">Emergency Contact Phone</label>
+              <input type="tel" value={form.emergency_contact_phone} onChange={(e) => setForm({ ...form, emergency_contact_phone: e.target.value })} className="input" autoComplete="off" />
+            </div>
+            <div>
+              <label className="label">WWCC Number</label>
+              <input type="text" value={form.wwcc_number} onChange={(e) => setForm({ ...form, wwcc_number: e.target.value })} className="input" autoComplete="off" />
+            </div>
+            <div>
+              <label className="label">WWCC Expiry</label>
+              <input type="date" value={form.wwcc_expiry} onChange={(e) => setForm({ ...form, wwcc_expiry: e.target.value })} className="input" />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Notes</label>
+              <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input min-h-[80px]" />
+            </div>
+            <div>
+              <label className="label">PIN * <span className="text-xs text-gray-500 font-normal">(4 digits — share with volunteer for kiosk sign-in)</span></label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={4}
+                  pattern="\d{4}"
+                  value={form.pin}
+                  onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
+                  className="input w-28 font-mono tracking-widest"
+                  placeholder="0000"
+                  required
+                  autoComplete="off"
+                />
+                <button type="button" onClick={generatePin} className="btn-secondary flex items-center gap-1 text-sm px-3">
+                  <RefreshCw size={14} /> Generate
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {addError && <p className="text-sm text-red-600">{addError}</p>}
+
+          <div className="flex gap-3 pt-2">
+            <button type="submit" disabled={addSubmitting} className="btn-primary disabled:opacity-50">
+              {addSubmitting ? 'Adding...' : 'Add Volunteer'}
+            </button>
+            <button type="button" onClick={() => { setShowAdd(false); setAddError(''); setForm(BLANK_FORM); }} className="btn-secondary">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* WWCC Alerts */}
       {wwccAlerts.length > 0 && (
@@ -89,9 +256,9 @@ export function VolunteersPage() {
           <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} className="input pl-10" placeholder="Search volunteers..." />
         </div>
-        <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="input w-auto">
-          <option value="">All Roles</option>
-          {VOLUNTEER_ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+        <select value={areaFilter} onChange={(e) => setAreaFilter(e.target.value)} className="input w-auto">
+          <option value="">All Areas</option>
+          {AREAS.map((a) => <option key={a.value} value={a.value}>{a.label}</option>)}
         </select>
       </div>
 
@@ -115,8 +282,11 @@ export function VolunteersPage() {
                   <div className="flex items-center gap-3">
                     <UserCheck size={18} className="text-navy dark:text-navy-300" />
                     <div>
-                      <div className="font-medium text-sm">{v.first_name} {v.last_name}</div>
-                      <div className="text-xs text-gray-500">{v.preferred_roles.join(', ') || 'No preferred roles'}</div>
+                      <div className="font-medium text-sm">
+                        {v.first_name} {v.last_name}
+                        {v.is_leader && <span className="ml-2 text-xs bg-gold/20 text-gold-700 dark:text-gold px-1.5 py-0.5 rounded">Leader</span>}
+                      </div>
+                      <div className="text-xs text-gray-500 capitalize">{v.area}</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
@@ -134,7 +304,7 @@ export function VolunteersPage() {
                       <div><span className="text-gray-500">Phone:</span> {v.phone || '—'}</div>
                       <div><span className="text-gray-500">Email:</span> {v.email || '—'}</div>
                       <div><span className="text-gray-500">Emergency:</span> {v.emergency_contact_name || '—'} {v.emergency_contact_phone ? `(${v.emergency_contact_phone})` : ''}</div>
-                      <div><span className="text-gray-500">Onboarded:</span> {v.onboarded_date ? formatDateAEST(v.onboarded_date + 'T00:00:00Z') : '—'}</div>
+                      <div><span className="text-gray-500">PIN:</span> <span className="font-mono">{v.pin}</span></div>
                       {v.wwcc_number && <div><span className="text-gray-500">WWCC:</span> {v.wwcc_number} (exp: {v.wwcc_expiry || '—'})</div>}
                       {v.notes && <div className="col-span-2"><span className="text-gray-500">Notes:</span> {v.notes}</div>}
                     </div>
