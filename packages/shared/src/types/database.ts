@@ -2,7 +2,6 @@ export interface Volunteer {
   id: string;
   first_name: string;
   last_name: string;
-  pin: string;
   phone: string | null;
   email: string | null;
   emergency_contact_name: string | null;

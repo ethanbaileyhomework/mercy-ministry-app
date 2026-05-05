@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useActiveSession } from '@mercy/shared';
 import { supabase } from '@/lib/supabase';
 import { SuccessScreen } from '@/components/ui/SuccessScreen';
@@ -21,7 +21,6 @@ interface FormData {
   emergency_contact_name: string;
   emergency_contact_phone: string;
   area: Area;
-  pin: string;
   wwcc_number: string;
   wwcc_expiry: string;
 }
@@ -33,7 +32,6 @@ const INITIAL_FORM: FormData = {
   emergency_contact_name: '',
   emergency_contact_phone: '',
   area: 'hall',
-  pin: '',
   wwcc_number: '',
   wwcc_expiry: '',
 };
@@ -51,11 +49,6 @@ export function RegisterScreen() {
     setForm((prev) => ({ ...prev, [field]: value }));
   };
 
-  const generatePin = useCallback(() => {
-    const pin = Math.floor(1000 + Math.random() * 9000).toString();
-    setForm((prev) => ({ ...prev, pin }));
-  }, []);
-
   const handleSubmit = useCallback(async () => {
     setSubmitting(true);
     try {
@@ -68,7 +61,6 @@ export function RegisterScreen() {
           emergency_contact_name: form.emergency_contact_name.trim() || null,
           emergency_contact_phone: form.emergency_contact_phone.trim() || null,
           area: form.area,
-          pin: form.pin,
           wwcc_number: form.wwcc_number.trim() || null,
           wwcc_expiry: form.wwcc_expiry || null,
         })
@@ -106,7 +98,6 @@ export function RegisterScreen() {
   }
 
   const canProceed1 = form.first_name.trim() && form.last_name.trim();
-  const canProceed3 = /^\d{4}$/.test(form.pin);
 
   return (
     <div className="flex flex-col h-full px-8 py-8">
@@ -243,40 +234,6 @@ export function RegisterScreen() {
               </div>
             </div>
 
-            {/* PIN creation */}
-            <div>
-              <p className="text-kiosk-body text-white/70 mb-4">
-                Choose a 4-digit PIN — you'll use this to sign in and out.
-              </p>
-              <div className="flex gap-4 items-center">
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  maxLength={4}
-                  value={form.pin}
-                  onChange={(e) => updateField('pin', e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  autoComplete="off"
-                  className="w-36 bg-white/10 border-2 border-white/20 rounded-2xl px-6 py-5
-                             text-kiosk-xl text-white text-center font-mono tracking-[0.5em]
-                             placeholder-white/30 focus:outline-none focus:border-gold/60"
-                  placeholder="••••"
-                />
-                <button
-                  type="button"
-                  onClick={generatePin}
-                  className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white
-                             rounded-2xl px-5 py-4 text-kiosk-body transition-colors"
-                >
-                  <RefreshCw size={20} /> Generate one for me
-                </button>
-              </div>
-              {form.pin && form.pin.length === 4 && (
-                <p className="mt-3 text-kiosk-body text-gold/80">
-                  Your PIN is <span className="font-mono font-bold tracking-widest">{form.pin}</span> — remember it!
-                </p>
-              )}
-            </div>
-
             {/* WWCC (optional) */}
             <div className="pt-2 border-t border-white/10">
               <p className="text-kiosk-body text-white/50 mb-4">
@@ -327,8 +284,8 @@ export function RegisterScreen() {
         ) : (
           <button
             onClick={handleSubmit}
-            disabled={submitting || !canProceed3}
-            className="kiosk-button-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={submitting}
+            className="kiosk-button-primary w-full disabled:opacity-50"
           >
             {submitting ? 'Registering...' : 'Complete Registration'}
           </button>

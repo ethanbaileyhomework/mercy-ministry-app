@@ -4,7 +4,6 @@ import { VOLUNTEER_ROLES, SESSION_STATUSES, FOOD_CATEGORIES, FOOD_SAFETY_RESULTS
 export const volunteerSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
   last_name: z.string().min(1, 'Last name is required'),
-  pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
   email: z.string().email('Invalid email').nullable().optional(),
   phone: z.string().nullable().optional(),
   area: z.string().min(1, 'Area is required'),
