@@ -73,7 +73,8 @@ export function RegisterScreen() {
         await supabase.from('volunteer_attendance').insert({
           session_id: session.id,
           volunteer_id: volunteer.id,
-          role_on_day: form.area === 'kitchen' ? 'Kitchen' : 'Hosting',
+          area_on_day: form.area,
+          is_leader_on_day: false,
           sign_in_time: new Date().toISOString(),
         });
       }

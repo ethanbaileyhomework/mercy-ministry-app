@@ -46,7 +46,7 @@ export function VolunteersPage() {
 
       const { data: att } = await supabase
         .from('volunteer_attendance')
-        .select('volunteer_id, hours_calculated');
+        .select('volunteer_id, hours_served');
 
       if (att) {
         const map: Record<string, { total_hours: number; session_count: number }> = {};
@@ -54,7 +54,7 @@ export function VolunteersPage() {
           const vid = a.volunteer_id as string;
           if (!map[vid]) map[vid] = { total_hours: 0, session_count: 0 };
           map[vid].session_count++;
-          map[vid].total_hours += (a.hours_calculated as number) || 0;
+          map[vid].total_hours += (a.hours_served as number) || 0;
         }
         setAttendanceMap(map);
       }

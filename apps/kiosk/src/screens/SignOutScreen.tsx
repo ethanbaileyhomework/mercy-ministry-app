@@ -10,7 +10,7 @@ import { useIdleTimeout } from '@/hooks/useIdleTimeout';
 
 interface SignedInVolunteer extends Volunteer {
   attendance_id: string;
-  role_on_day: string;
+  area_on_day: string;
   sign_in_time: string;
 }
 
@@ -32,7 +32,7 @@ export function SignOutScreen() {
     async function loadSignedIn() {
       const { data, error } = await supabase
         .from('volunteer_attendance')
-        .select('id, volunteer_id, role_on_day, sign_in_time, volunteers(first_name, last_name, area, email, phone)')
+        .select('id, volunteer_id, area_on_day, sign_in_time, volunteers(first_name, last_name, area, email, phone)')
         .eq('session_id', session!.id)
         .is('sign_out_time', null);
 
@@ -49,12 +49,11 @@ export function SignOutScreen() {
           attendance_id: a.id as string,
           first_name: vol.first_name as string,
           last_name: vol.last_name as string,
-          role_on_day: a.role_on_day as string,
+          area_on_day: a.area_on_day as string,
           sign_in_time: a.sign_in_time as string,
           area: vol.area as string,
           email: vol.email as string | null,
           phone: vol.phone as string | null,
-          pin: '',
           is_leader: false,
           emergency_contact_name: null,
           emergency_contact_phone: null,
@@ -151,7 +150,7 @@ export function SignOutScreen() {
                   key={v.attendance_id}
                   firstName={v.first_name}
                   lastName={v.last_name}
-                  subtitle={`Signed in as ${v.role_on_day}`}
+                  subtitle={`Signed in for ${v.area_on_day.charAt(0).toUpperCase() + v.area_on_day.slice(1)}`}
                   onClick={() => handleSelect(v)}
                 />
               ))

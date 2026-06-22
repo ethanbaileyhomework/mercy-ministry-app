@@ -18,15 +18,14 @@ export interface Volunteer {
 export interface Session {
   id: string;
   session_date: string;
-  start_time: string | null;
-  end_time: string | null;
-  coordinator_id: string | null;
-  status: SessionStatus;
-  total_guests_served: number;
-  total_meals_served: number;
-  total_grocery_packs: number;
-  session_notes: string | null;
-  weather_conditions: string | null;
+  status: string;
+  started_at: string | null;
+  ended_at: string | null;
+  coordinator_notes: string | null;
+  people_served: number | null;
+  meals_served: number | null;
+  what_was_served: string | null;
+  grocery_packs_given: number | null;
   created_at: string;
 }
 
@@ -34,11 +33,11 @@ export interface VolunteerAttendance {
   id: string;
   session_id: string;
   volunteer_id: string;
-  role_on_day: VolunteerRole;
+  area_on_day: string;
+  is_leader_on_day: boolean;
   sign_in_time: string;
   sign_out_time: string | null;
-  hours_calculated: number | null;
-  notes: string | null;
+  hours_served: number | null;
 }
 
 export interface GuestRecord {
@@ -61,14 +60,13 @@ export interface FoodSafetyLog {
   id: string;
   session_id: string;
   food_item: string;
-  food_category: FoodCategory | null;
+  food_type: string | null;
   temp_celsius: number | null;
-  check_time: string;
+  logged_at: string;
   logged_by_id: string | null;
-  pass_fail: FoodSafetyResult | null;
+  result: string | null;
   corrective_action: string | null;
   probe_id: string | null;
-  notes: string | null;
 }
 
 export interface InventoryItem {
@@ -109,19 +107,18 @@ export interface Announcement {
   created_at: string;
 }
 
-// Insert types (omit auto-generated fields)
+// Insert types
 export type VolunteerInsert = Omit<Volunteer, 'id' | 'created_at' | 'is_active'> & {
   is_active?: boolean;
 };
 
+export type SessionInsert = Omit<Session, 'id' | 'created_at' | 'people_served' | 'meals_served' | 'grocery_packs_given'>;
 
-export type SessionInsert = Omit<Session, 'id' | 'created_at' | 'total_guests_served' | 'total_meals_served' | 'total_grocery_packs'>;
-
-export type AttendanceInsert = Omit<VolunteerAttendance, 'id' | 'sign_out_time' | 'hours_calculated'>;
+export type AttendanceInsert = Omit<VolunteerAttendance, 'id' | 'sign_out_time' | 'hours_served'>;
 
 export type GuestRecordInsert = Omit<GuestRecord, 'id' | 'registered_at'>;
 
-export type FoodSafetyLogInsert = Omit<FoodSafetyLog, 'id' | 'pass_fail'>;
+export type FoodSafetyLogInsert = Omit<FoodSafetyLog, 'id' | 'result'>;
 
 export type InventoryItemInsert = Omit<InventoryItem, 'id' | 'last_updated' | 'current_quantity' | 'is_active'>;
 
@@ -130,4 +127,4 @@ export type InventoryTransactionInsert = Omit<InventoryTransaction, 'id' | 'crea
 export type AnnouncementInsert = Omit<Announcement, 'id' | 'created_at' | 'is_active'>;
 
 // Import enums used above
-import type { SessionStatus, FoodCategory, FoodSafetyResult, InventoryCategory, InventoryUnit, TransactionType } from './enums';
+import type { InventoryCategory, InventoryUnit, TransactionType } from './enums';

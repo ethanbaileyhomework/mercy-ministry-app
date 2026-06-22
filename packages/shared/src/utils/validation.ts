@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { VOLUNTEER_ROLES, SESSION_STATUSES, FOOD_CATEGORIES, FOOD_SAFETY_RESULTS, INVENTORY_CATEGORIES, INVENTORY_UNITS, TRANSACTION_TYPES } from '../types/enums';
+import { SESSION_STATUSES, INVENTORY_CATEGORIES, INVENTORY_UNITS, TRANSACTION_TYPES } from '../types/enums';
 
 export const volunteerSchema = z.object({
   first_name: z.string().min(1, 'First name is required'),
@@ -17,20 +17,16 @@ export const volunteerSchema = z.object({
 
 export const sessionSchema = z.object({
   session_date: z.string().min(1, 'Date is required'),
-  start_time: z.string().nullable().optional(),
-  end_time: z.string().nullable().optional(),
-  coordinator_id: z.string().uuid().nullable().optional(),
   status: z.enum(SESSION_STATUSES).default('draft'),
-  session_notes: z.string().nullable().optional(),
-  weather_conditions: z.string().nullable().optional(),
+  coordinator_notes: z.string().nullable().optional(),
 });
 
 export const attendanceSchema = z.object({
   session_id: z.string().uuid('Invalid session'),
   volunteer_id: z.string().uuid('Invalid volunteer'),
-  role_on_day: z.enum(VOLUNTEER_ROLES),
+  area_on_day: z.string(),
+  is_leader_on_day: z.boolean().default(false),
   sign_in_time: z.string(),
-  notes: z.string().nullable().optional(),
 });
 
 export const guestRecordSchema = z.object({
@@ -50,13 +46,12 @@ export const guestRecordSchema = z.object({
 export const foodSafetyLogSchema = z.object({
   session_id: z.string().uuid(),
   food_item: z.string().min(1, 'Food item name is required'),
-  food_category: z.enum(FOOD_CATEGORIES).nullable().optional(),
+  food_type: z.string().nullable().optional(),
   temp_celsius: z.number().min(-50).max(300).nullable().optional(),
-  check_time: z.string(),
+  logged_at: z.string(),
   logged_by_id: z.string().uuid().nullable().optional(),
   corrective_action: z.string().nullable().optional(),
   probe_id: z.string().nullable().optional(),
-  notes: z.string().nullable().optional(),
 });
 
 export const inventoryItemSchema = z.object({
