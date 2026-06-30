@@ -1,5 +1,4 @@
 import { openDB, type IDBPDatabase } from 'idb';
-import type { Volunteer } from '@mercy/shared';
 
 const DB_NAME = 'mercy-kiosk-offline';
 const DB_VERSION = 2;
@@ -44,21 +43,4 @@ export async function refreshCache(supabase: import('@supabase/supabase-js').Sup
   } catch (err) {
     console.error('Failed to refresh volunteer cache:', err);
   }
-}
-
-export async function getCachedVolunteers(): Promise<Volunteer[]> {
-  const db = await getDb();
-  return db.getAll(STORE_NAME) as Promise<Volunteer[]>;
-}
-
-export async function searchCached(query: string): Promise<Volunteer[]> {
-  const all = await getCachedVolunteers();
-  if (!query.trim()) return [];
-  const q = query.toLowerCase();
-  return all.filter(
-    (v) =>
-      v.first_name.toLowerCase().includes(q) ||
-      v.last_name.toLowerCase().includes(q) ||
-      `${v.first_name} ${v.last_name}`.toLowerCase().includes(q)
-  );
 }

@@ -1,13 +1,3 @@
-export const VOLUNTEER_ROLES = [
-  'Kitchen',
-  'Serving',
-  'Groceries',
-  'Registration',
-  'Cleanup',
-  'Hosting',
-] as const;
-export type VolunteerRole = (typeof VOLUNTEER_ROLES)[number];
-
 export const SESSION_STATUSES = ['draft', 'active', 'completed', 'cancelled'] as const;
 export type SessionStatus = (typeof SESSION_STATUSES)[number];
 

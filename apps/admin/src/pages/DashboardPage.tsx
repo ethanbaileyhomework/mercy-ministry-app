@@ -24,11 +24,14 @@ export function DashboardPage() {
   const loadStats = useCallback(async () => {
     if (!session) return;
 
-    const { data: attendance } = await supabase
-      .from('volunteer_attendance')
-      .select('*, volunteers(first_name, last_name)')
-      .eq('session_id', session.id)
-      .is('sign_out_time', null);
+    const [{ data: attendance }, { data: freshSession }] = await Promise.all([
+      supabase
+        .from('volunteer_attendance')
+        .select('*, volunteers(first_name, last_name)')
+        .eq('session_id', session.id)
+        .is('sign_out_time', null),
+      supabase.from('sessions').select('*').eq('id', session.id).single(),
+    ]);
 
     const signedIn = (attendance || []).map((a: Record<string, unknown>) => {
       const vol = a.volunteers as Record<string, unknown>;
@@ -37,12 +40,6 @@ export function DashboardPage() {
         volunteer_name: `${vol.first_name} ${vol.last_name}`,
       };
     });
-
-    const { data: freshSession } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('id', session.id)
-      .single();
 
     if (freshSession) {
       setSession(freshSession as Session);
@@ -68,13 +65,20 @@ export function DashboardPage() {
       }
     }
 
-    const { data: lastCheck } = await supabase
-      .from('food_safety_logs')
-      .select('logged_at')
-      .eq('session_id', session.id)
-      .order('logged_at', { ascending: false })
-      .limit(1)
-      .single();
+    const [{ data: lastCheck }, { data: lowStock }] = await Promise.all([
+      supabase
+        .from('food_safety_logs')
+        .select('logged_at')
+        .eq('session_id', session.id)
+        .order('logged_at', { ascending: false })
+        .limit(1)
+        .single(),
+      supabase
+        .from('inventory_items')
+        .select('item_name, current_quantity, minimum_threshold')
+        .eq('is_active', true)
+        .not('minimum_threshold', 'is', null),
+    ]);
 
     if (lastCheck) {
       const lastCheckTime = new Date(lastCheck.logged_at as string);
@@ -85,12 +89,6 @@ export function DashboardPage() {
     } else if (s.status === 'active') {
       newAlerts.push('No food temperature checks logged for this session');
     }
-
-    const { data: lowStock } = await supabase
-      .from('inventory_items')
-      .select('item_name, current_quantity, minimum_threshold')
-      .eq('is_active', true)
-      .not('minimum_threshold', 'is', null);
 
     for (const item of lowStock || []) {
       if ((item.current_quantity as number) <= (item.minimum_threshold as number)) {
@@ -145,8 +143,13 @@ export function DashboardPage() {
   };
 
   const handleCloseSession = async () => {
-    if (!session || !confirm('Close this session? This will lock it for reporting.')) return;
+    if (!session || !confirm('Close this session? This will sign out all remaining volunteers and lock it for reporting.')) return;
     const now = new Date().toISOString();
+    await supabase
+      .from('volunteer_attendance')
+      .update({ sign_out_time: now })
+      .eq('session_id', session.id)
+      .is('sign_out_time', null);
     await supabase.from('sessions').update({ status: 'completed', ended_at: now }).eq('id', session.id);
     setSession({ ...session, status: 'completed', ended_at: now });
   };
