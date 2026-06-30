@@ -29,11 +29,6 @@ function getDb() {
   return dbPromise;
 }
 
-export async function enqueue(mutation: Omit<QueuedMutation, 'timestamp'>): Promise<void> {
-  const db = await getDb();
-  await db.put(STORE_NAME, { ...mutation, timestamp: Date.now() });
-}
-
 export async function getAll(): Promise<QueuedMutation[]> {
   const db = await getDb();
   const all = await db.getAll(STORE_NAME);

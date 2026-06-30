@@ -41,10 +41,10 @@ export async function generate({ supabase, dateFrom, dateTo }: ReportParams) {
   const tableData = sessions.map((s: Record<string, unknown>) => [
     s.session_date as string,
     s.status as string,
-    String(s.total_guests_served),
-    String(s.total_meals_served),
-    String(s.total_grocery_packs),
-    (s.session_notes as string)?.slice(0, 40) || '—',
+    String(s.people_served ?? '—'),
+    String(s.meals_served ?? '—'),
+    String(s.grocery_packs_given ?? '—'),
+    (s.coordinator_notes as string)?.slice(0, 40) || '—',
   ]);
 
   autoTable(doc, {
@@ -59,9 +59,9 @@ export async function generate({ supabase, dateFrom, dateTo }: ReportParams) {
   // Totals
   const totals = sessions.reduce(
     (acc: Record<string, number>, s: Record<string, unknown>) => ({
-      guests: acc.guests + (s.total_guests_served as number),
-      meals: acc.meals + (s.total_meals_served as number),
-      packs: acc.packs + (s.total_grocery_packs as number),
+      guests: acc.guests + ((s.people_served as number) || 0),
+      meals: acc.meals + ((s.meals_served as number) || 0),
+      packs: acc.packs + ((s.grocery_packs_given as number) || 0),
     }),
     { guests: 0, meals: 0, packs: 0 }
   );

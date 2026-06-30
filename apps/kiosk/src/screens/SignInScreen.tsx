@@ -1,44 +1,49 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
-import { VOLUNTEER_ROLES, useActiveSession, type Volunteer, type VolunteerRole } from '@mercy/shared';
+import { useActiveSession, type Volunteer } from '@mercy/shared';
 import { supabase } from '@/lib/supabase';
 import { SearchInput } from '@/components/ui/SearchInput';
 import { NameTile } from '@/components/ui/NameTile';
-import { RoleChip } from '@/components/ui/RoleChip';
 import { SuccessScreen } from '@/components/ui/SuccessScreen';
 import { useVolunteerSearch } from '@/hooks/useVolunteerSearch';
 import { useIdleTimeout } from '@/hooks/useIdleTimeout';
 
-type Step = 'search' | 'role' | 'success';
+const AREAS = [
+  { value: 'hall', label: 'Hall' },
+  { value: 'kitchen', label: 'Kitchen' },
+] as const;
+
+type Step = 'search' | 'area' | 'success';
 
 export function SignInScreen() {
   useIdleTimeout();
   const navigate = useNavigate();
-  const { session } = useActiveSession(supabase);
+  const { session, loading: sessionLoading } = useActiveSession(supabase);
   const { filtered, searchQuery, setSearchQuery, loading } = useVolunteerSearch();
   const [step, setStep] = useState<Step>('search');
   const [selectedVolunteer, setSelectedVolunteer] = useState<Volunteer | null>(null);
-  const [selectedRole, setSelectedRole] = useState<VolunteerRole | null>(null);
+  const [selectedArea, setSelectedArea] = useState<string>('hall');
+  const [isLeader, setIsLeader] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleSelectVolunteer = useCallback((volunteer: Volunteer) => {
     setSelectedVolunteer(volunteer);
-    if (volunteer.area === 'kitchen') {
-      setSelectedRole('Kitchen');
-    }
-    setStep('role');
+    setSelectedArea(volunteer.area);
+    setIsLeader(volunteer.is_leader);
+    setStep('area');
   }, []);
 
   const handleConfirmSignIn = useCallback(async () => {
-    if (!selectedVolunteer || !selectedRole || !session) return;
+    if (!selectedVolunteer || !session) return;
     setSubmitting(true);
 
     try {
       const { error } = await supabase.from('volunteer_attendance').insert({
         session_id: session.id,
         volunteer_id: selectedVolunteer.id,
-        role_on_day: selectedRole,
+        area_on_day: selectedArea,
+        is_leader_on_day: isLeader,
         sign_in_time: new Date().toISOString(),
       });
 
@@ -50,29 +55,38 @@ export function SignInScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [selectedVolunteer, selectedRole, session]);
+  }, [selectedVolunteer, selectedArea, isLeader, session]);
 
   if (step === 'success' && selectedVolunteer) {
     return (
       <SuccessScreen
         title={`Welcome, ${selectedVolunteer.first_name}!`}
-        subtitle={`You are signed in as ${selectedRole}. Thank you for serving tonight.`}
+        subtitle={`You are signed in for ${selectedArea}. Thank you for serving tonight.`}
       />
+    );
+  }
+
+  if (!sessionLoading && !session) {
+    return (
+      <div className="flex flex-col h-full px-8 py-8 items-center justify-center text-center">
+        <p className="text-kiosk-xl text-white mb-4">No active session today</p>
+        <p className="text-kiosk-body text-white/60 mb-8">Ask the coordinator to start a session in the admin app.</p>
+        <button onClick={() => navigate('/')} className="kiosk-button-outline">Go Back</button>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col h-full px-8 py-8">
-      {/* Header with back button */}
       <div className="flex items-center gap-4 mb-6">
         <button
-          onClick={() => step === 'role' ? setStep('search') : navigate('/')}
+          onClick={() => step === 'area' ? setStep('search') : navigate('/')}
           className="touch-target p-2 rounded-xl hover:bg-white/10 transition-colors"
         >
           <ArrowLeft size={32} />
         </button>
         <h1 className="text-kiosk-2xl font-bold">
-          {step === 'search' ? 'Sign In' : 'Select Your Role'}
+          {step === 'search' ? 'Sign In' : 'Confirm Your Area'}
         </h1>
       </div>
 
@@ -97,7 +111,7 @@ export function SignInScreen() {
                   key={v.id}
                   firstName={v.first_name}
                   lastName={v.last_name}
-                  subtitle={v.area ? `Area: ${v.area.charAt(0).toUpperCase() + v.area.slice(1)}` : undefined}
+                  subtitle={`Area: ${v.area.charAt(0).toUpperCase() + v.area.slice(1)}`}
                   onClick={() => handleSelectVolunteer(v)}
                 />
               ))
@@ -106,30 +120,35 @@ export function SignInScreen() {
         </>
       )}
 
-      {step === 'role' && selectedVolunteer && (
+      {step === 'area' && selectedVolunteer && (
         <>
           <p className="text-kiosk-lg text-white/70 mb-6">
-            Hi {selectedVolunteer.first_name}! What role are you filling tonight?
+            Hi {selectedVolunteer.first_name}! Where are you serving tonight?
           </p>
 
-          <div className="grid grid-cols-2 gap-4 flex-1 overflow-y-auto pb-4">
-            {VOLUNTEER_ROLES.map((role) => (
-              <RoleChip
-                key={role}
-                role={role}
-                selected={selectedRole === role}
-                suggested={role === 'Kitchen' && selectedVolunteer.area === 'kitchen'}
-                onClick={() => setSelectedRole(role)}
-              />
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            {AREAS.map((a) => (
+              <button
+                key={a.value}
+                type="button"
+                onClick={() => setSelectedArea(a.value)}
+                className={`rounded-2xl py-8 text-kiosk-xl font-semibold transition-colors ${
+                  selectedArea === a.value
+                    ? 'bg-gold text-navy'
+                    : 'bg-white/10 text-white hover:bg-white/20'
+                }`}
+              >
+                {a.label}
+              </button>
             ))}
           </div>
 
           <button
             onClick={handleConfirmSignIn}
-            disabled={!selectedRole || submitting}
-            className="kiosk-button-primary w-full mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={submitting}
+            className="kiosk-button-primary w-full mt-auto disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {submitting ? 'Signing in...' : `Confirm — Sign In as ${selectedRole || '...'}`}
+            {submitting ? 'Signing in...' : `Confirm — Sign In for ${selectedArea.charAt(0).toUpperCase() + selectedArea.slice(1)}`}
           </button>
         </>
       )}

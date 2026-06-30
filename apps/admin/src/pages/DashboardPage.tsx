@@ -24,12 +24,14 @@ export function DashboardPage() {
   const loadStats = useCallback(async () => {
     if (!session) return;
 
-    // Volunteer count
-    const { data: attendance } = await supabase
-      .from('volunteer_attendance')
-      .select('*, volunteers(first_name, last_name)')
-      .eq('session_id', session.id)
-      .is('sign_out_time', null);
+    const [{ data: attendance }, { data: freshSession }] = await Promise.all([
+      supabase
+        .from('volunteer_attendance')
+        .select('*, volunteers(first_name, last_name)')
+        .eq('session_id', session.id)
+        .is('sign_out_time', null),
+      supabase.from('sessions').select('*').eq('id', session.id).single(),
+    ]);
 
     const signedIn = (attendance || []).map((a: Record<string, unknown>) => {
       const vol = a.volunteers as Record<string, unknown>;
@@ -39,13 +41,6 @@ export function DashboardPage() {
       };
     });
 
-    // Refresh session data for totals
-    const { data: freshSession } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('id', session.id)
-      .single();
-
     if (freshSession) {
       setSession(freshSession as Session);
     }
@@ -53,16 +48,14 @@ export function DashboardPage() {
     const s = freshSession || session;
     setStats({
       volunteerCount: signedIn.length,
-      guestCount: s.total_guests_served as number,
-      mealsServed: s.total_meals_served as number,
-      groceryPacks: s.total_grocery_packs as number,
+      guestCount: (s.people_served as number) || 0,
+      mealsServed: (s.meals_served as number) || 0,
+      groceryPacks: (s.grocery_packs_given as number) || 0,
       signedInVolunteers: signedIn as DashboardStats['signedInVolunteers'],
     });
 
-    // Build alerts
     const newAlerts: string[] = [];
 
-    // Check for volunteers signed in > 5 hours
     const now = new Date();
     for (const vol of signedIn) {
       const signIn = new Date(vol.sign_in_time as string);
@@ -72,17 +65,23 @@ export function DashboardPage() {
       }
     }
 
-    // Check for overdue food safety checks
-    const { data: lastCheck } = await supabase
-      .from('food_safety_logs')
-      .select('check_time')
-      .eq('session_id', session.id)
-      .order('check_time', { ascending: false })
-      .limit(1)
-      .single();
+    const [{ data: lastCheck }, { data: lowStock }] = await Promise.all([
+      supabase
+        .from('food_safety_logs')
+        .select('logged_at')
+        .eq('session_id', session.id)
+        .order('logged_at', { ascending: false })
+        .limit(1)
+        .single(),
+      supabase
+        .from('inventory_items')
+        .select('item_name, current_quantity, minimum_threshold')
+        .eq('is_active', true)
+        .not('minimum_threshold', 'is', null),
+    ]);
 
     if (lastCheck) {
-      const lastCheckTime = new Date(lastCheck.check_time as string);
+      const lastCheckTime = new Date(lastCheck.logged_at as string);
       const hoursSinceCheck = (now.getTime() - lastCheckTime.getTime()) / (1000 * 60 * 60);
       if (hoursSinceCheck >= 2 && s.status === 'active') {
         newAlerts.push('Food temperature check overdue (last check > 2 hours ago)');
@@ -90,13 +89,6 @@ export function DashboardPage() {
     } else if (s.status === 'active') {
       newAlerts.push('No food temperature checks logged for this session');
     }
-
-    // Check low inventory
-    const { data: lowStock } = await supabase
-      .from('inventory_items')
-      .select('item_name, current_quantity, minimum_threshold')
-      .eq('is_active', true)
-      .not('minimum_threshold', 'is', null);
 
     for (const item of lowStock || []) {
       if ((item.current_quantity as number) <= (item.minimum_threshold as number)) {
@@ -107,10 +99,8 @@ export function DashboardPage() {
     setAlerts(newAlerts);
   }, [session, setSession]);
 
-  // Load stats on mount and on realtime changes
   useEffect(() => { loadStats(); }, [loadStats]);
 
-  // Subscribe to realtime updates
   useRealtimeTable({
     supabase,
     table: 'volunteer_attendance',
@@ -127,15 +117,12 @@ export function DashboardPage() {
     enabled: !!session,
   });
 
-  // Session elapsed timer
   useEffect(() => {
-    if (!session || session.status !== 'active' || !session.start_time) return;
+    if (!session || session.status !== 'active' || !session.started_at) return;
 
     const updateElapsed = () => {
       const now = new Date();
-      // start_time is just a time, combine with session_date
-      const startStr = `${session.session_date}T${session.start_time}`;
-      const start = new Date(startStr);
+      const start = new Date(session.started_at!);
       const diff = now.getTime() - start.getTime();
       if (diff < 0) { setSessionElapsed(''); return; }
       const h = Math.floor(diff / 3_600_000);
@@ -150,18 +137,21 @@ export function DashboardPage() {
 
   const handleOpenSession = async () => {
     if (!session) return;
-    const now = new Date();
-    const timeStr = now.toTimeString().slice(0, 5);
-    await supabase.from('sessions').update({ status: 'active', start_time: timeStr }).eq('id', session.id);
-    setSession({ ...session, status: 'active', start_time: timeStr });
+    const now = new Date().toISOString();
+    await supabase.from('sessions').update({ status: 'active', started_at: now }).eq('id', session.id);
+    setSession({ ...session, status: 'active', started_at: now });
   };
 
   const handleCloseSession = async () => {
-    if (!session || !confirm('Close this session? This will lock it for reporting.')) return;
-    const now = new Date();
-    const timeStr = now.toTimeString().slice(0, 5);
-    await supabase.from('sessions').update({ status: 'completed', end_time: timeStr }).eq('id', session.id);
-    setSession({ ...session, status: 'completed', end_time: timeStr });
+    if (!session || !confirm('Close this session? This will sign out all remaining volunteers and lock it for reporting.')) return;
+    const now = new Date().toISOString();
+    await supabase
+      .from('volunteer_attendance')
+      .update({ sign_out_time: now })
+      .eq('session_id', session.id)
+      .is('sign_out_time', null);
+    await supabase.from('sessions').update({ status: 'completed', ended_at: now }).eq('id', session.id);
+    setSession({ ...session, status: 'completed', ended_at: now });
   };
 
   if (!session) {
@@ -179,7 +169,6 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Session header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold">Session Control Centre</h1>
@@ -202,7 +191,6 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {/* Alerts */}
       {alerts.length > 0 && (
         <div className="space-y-2">
           {alerts.map((alert, i) => (
@@ -214,7 +202,6 @@ export function DashboardPage() {
         </div>
       )}
 
-      {/* Stats grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={Users} label="Volunteers" value={stats.volunteerCount} color="text-navy dark:text-navy-300" />
         <StatCard icon={Users} label="Guests Served" value={stats.guestCount} color="text-green-600 dark:text-green-400" />
@@ -222,7 +209,6 @@ export function DashboardPage() {
         <StatCard icon={ShoppingBag} label="Grocery Packs" value={stats.groceryPacks} color="text-purple-600 dark:text-purple-400" />
       </div>
 
-      {/* Currently signed in */}
       <div className="card p-6">
         <h2 className="text-lg font-semibold mb-4">Currently Signed In</h2>
         {stats.signedInVolunteers.length === 0 ? (
@@ -233,7 +219,7 @@ export function DashboardPage() {
               <div key={v.id} className="flex items-center justify-between bg-gray-50 dark:bg-gray-800 rounded-lg px-4 py-3">
                 <div>
                   <div className="font-medium text-sm">{v.volunteer_name}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">{v.role_on_day}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 capitalize">{v.area_on_day}</div>
                 </div>
                 <div className="text-xs text-gray-400">
                   {formatTimeAEST(v.sign_in_time)}

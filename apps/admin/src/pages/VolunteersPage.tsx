@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Search, UserCheck, AlertTriangle, ChevronDown, ChevronUp, Plus, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, UserCheck, AlertTriangle, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import { type Volunteer, formatDateAEST } from '@mercy/shared';
 import { supabase } from '@/lib/supabase';
 
@@ -20,7 +20,6 @@ const BLANK_FORM = {
   wwcc_number: '',
   wwcc_expiry: '',
   notes: '',
-  pin: '',
 };
 
 export function VolunteersPage() {
@@ -47,7 +46,7 @@ export function VolunteersPage() {
 
       const { data: att } = await supabase
         .from('volunteer_attendance')
-        .select('volunteer_id, hours_calculated');
+        .select('volunteer_id, hours_served');
 
       if (att) {
         const map: Record<string, { total_hours: number; session_count: number }> = {};
@@ -55,7 +54,7 @@ export function VolunteersPage() {
           const vid = a.volunteer_id as string;
           if (!map[vid]) map[vid] = { total_hours: 0, session_count: 0 };
           map[vid].session_count++;
-          map[vid].total_hours += (a.hours_calculated as number) || 0;
+          map[vid].total_hours += (a.hours_served as number) || 0;
         }
         setAttendanceMap(map);
       }
@@ -83,21 +82,11 @@ export function VolunteersPage() {
     setVolunteers(volunteers.filter((v) => v.id !== vol.id));
   };
 
-  const generatePin = useCallback(() => {
-    const pin = Math.floor(1000 + Math.random() * 9000).toString();
-    setForm((f) => ({ ...f, pin }));
-  }, []);
-
   const handleAddVolunteer = async (e: React.FormEvent) => {
     e.preventDefault();
     setAddError('');
-
-    if (!/^\d{4}$/.test(form.pin)) {
-      setAddError('PIN must be exactly 4 digits.');
-      return;
-    }
-
     setAddSubmitting(true);
+
     const { data, error } = await supabase
       .from('volunteers')
       .insert({
@@ -112,7 +101,6 @@ export function VolunteersPage() {
         wwcc_number: form.wwcc_number.trim() || null,
         wwcc_expiry: form.wwcc_expiry || null,
         notes: form.notes.trim() || null,
-        pin: form.pin,
       })
       .select()
       .single();
@@ -199,26 +187,6 @@ export function VolunteersPage() {
               <label className="label">Notes</label>
               <textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="input min-h-[80px]" />
             </div>
-            <div>
-              <label className="label">PIN * <span className="text-xs text-gray-500 font-normal">(4 digits — share with volunteer for kiosk sign-in)</span></label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={4}
-                  pattern="\d{4}"
-                  value={form.pin}
-                  onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '').slice(0, 4) })}
-                  className="input w-28 font-mono tracking-widest"
-                  placeholder="0000"
-                  required
-                  autoComplete="off"
-                />
-                <button type="button" onClick={generatePin} className="btn-secondary flex items-center gap-1 text-sm px-3">
-                  <RefreshCw size={14} /> Generate
-                </button>
-              </div>
-            </div>
           </div>
 
           {addError && <p className="text-sm text-red-600">{addError}</p>}
@@ -304,7 +272,6 @@ export function VolunteersPage() {
                       <div><span className="text-gray-500">Phone:</span> {v.phone || '—'}</div>
                       <div><span className="text-gray-500">Email:</span> {v.email || '—'}</div>
                       <div><span className="text-gray-500">Emergency:</span> {v.emergency_contact_name || '—'} {v.emergency_contact_phone ? `(${v.emergency_contact_phone})` : ''}</div>
-                      <div><span className="text-gray-500">PIN:</span> <span className="font-mono">{v.pin}</span></div>
                       {v.wwcc_number && <div><span className="text-gray-500">WWCC:</span> {v.wwcc_number} (exp: {v.wwcc_expiry || '—'})</div>}
                       {v.notes && <div className="col-span-2"><span className="text-gray-500">Notes:</span> {v.notes}</div>}
                     </div>

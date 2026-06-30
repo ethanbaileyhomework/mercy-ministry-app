@@ -12,10 +12,10 @@ interface ReportParams {
 export async function generate({ supabase, dateFrom, dateTo }: ReportParams) {
   const { data: attendance } = await supabase
     .from('volunteer_attendance')
-    .select('volunteer_id, hours_calculated, role_on_day, sessions!inner(session_date), volunteers!inner(first_name, last_name)')
+    .select('volunteer_id, hours_served, area_on_day, sessions!inner(session_date), volunteers!inner(first_name, last_name)')
     .gte('sessions.session_date', dateFrom)
     .lte('sessions.session_date', dateTo)
-    .not('hours_calculated', 'is', null);
+    .not('hours_served', 'is', null);
 
   if (!attendance || attendance.length === 0) {
     alert('No attendance records found in the selected date range.');
@@ -30,7 +30,7 @@ export async function generate({ supabase, dateFrom, dateTo }: ReportParams) {
     if (!byVolunteer[vid]) {
       byVolunteer[vid] = { name: `${vol.first_name} ${vol.last_name}`, hours: 0, sessions: 0 };
     }
-    byVolunteer[vid].hours += (a.hours_calculated as number) || 0;
+    byVolunteer[vid].hours += (a.hours_served as number) || 0;
     byVolunteer[vid].sessions++;
   }
 

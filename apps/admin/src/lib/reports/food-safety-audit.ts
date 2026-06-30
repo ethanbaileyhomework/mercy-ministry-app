@@ -15,7 +15,7 @@ export async function generate({ supabase, dateFrom, dateTo }: ReportParams) {
     .select('*, sessions!inner(session_date), volunteers(first_name, last_name)')
     .gte('sessions.session_date', dateFrom)
     .lte('sessions.session_date', dateTo)
-    .order('check_time', { ascending: false });
+    .order('logged_at', { ascending: false });
 
   if (!logs || logs.length === 0) {
     alert('No food safety logs found in the selected date range.');
@@ -40,9 +40,9 @@ export async function generate({ supabase, dateFrom, dateTo }: ReportParams) {
     return [
       session?.session_date || '—',
       l.food_item as string,
-      (l.food_category as string)?.replace('_', ' ') || '—',
+      (l.food_type as string)?.replace('_', ' ') || '—',
       l.temp_celsius ? `${l.temp_celsius}°C` : '—',
-      l.pass_fail as string,
+      (l.result as string) || '—',
       l.probe_id || '—',
       vol ? `${vol.first_name} ${vol.last_name}` : '—',
       (l.corrective_action as string)?.slice(0, 30) || '—',
@@ -69,8 +69,8 @@ export async function generate({ supabase, dateFrom, dateTo }: ReportParams) {
   });
 
   // Summary
-  const passCount = logs.filter((l: Record<string, unknown>) => l.pass_fail === 'PASS').length;
-  const failCount = logs.filter((l: Record<string, unknown>) => l.pass_fail === 'FAIL').length;
+  const passCount = logs.filter((l: Record<string, unknown>) => l.result === 'PASS').length;
+  const failCount = logs.filter((l: Record<string, unknown>) => l.result === 'FAIL').length;
   const passRate = logs.length > 0 ? ((passCount / logs.length) * 100).toFixed(1) : '0';
 
   const finalY = (doc as unknown as Record<string, number>).lastAutoTable?.finalY || 100;
