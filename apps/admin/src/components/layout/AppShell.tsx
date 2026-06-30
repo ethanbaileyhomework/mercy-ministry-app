@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { useActiveSession } from '@mercy/shared';
@@ -8,6 +8,12 @@ import { supabase } from '@/lib/supabase';
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { session } = useActiveSession(supabase);
+  const location = useLocation();
+
+  // Close sidebar whenever the route changes (mobile nav)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="flex h-dvh overflow-hidden">
