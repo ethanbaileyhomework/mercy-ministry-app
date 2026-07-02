@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard, Thermometer, Clock, Users, AlertTriangle, Heart, X, FileText,
+  LayoutDashboard, Thermometer, Clock, Users, AlertTriangle, Heart, X, FileText, Database, Globe,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +11,8 @@ const NAV_ITEMS = [
   { to: '/reports', icon: FileText, label: 'Reports' },
   { to: '/volunteers', icon: Users, label: 'Volunteers' },
   { to: '/incidents', icon: AlertTriangle, label: 'Incidents' },
+  { to: '/guests', icon: Database, label: 'Raw Data' },
+  { to: '/website-content', icon: Globe, label: 'Website Editor' },
 ];
 
 interface SidebarProps {
