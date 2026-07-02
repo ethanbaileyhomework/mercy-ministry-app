@@ -12,6 +12,7 @@
     "build:kiosk": "npm -w @mercy/shared run build && npm -w @mercy/kiosk run build",
     "build:admin": "npm -w @mercy/shared run build && npm -w @mercy/admin run build",
     "build": "npm -w @mercy/shared run build && npm -w @mercy/kiosk run build && npm -w @mercy/admin run build",
+    "postbuild": "node scripts/copy-vercel-dist.js",
     "test": "vitest run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
