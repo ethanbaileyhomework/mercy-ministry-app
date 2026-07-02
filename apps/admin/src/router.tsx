@@ -9,7 +9,7 @@ const HistoryPage = lazy(() => import('./pages/HistoryPage').then(m => ({ defaul
 const ReportsPage = lazy(() => import('./pages/ReportsPage').then(m => ({ default: m.ReportsPage })));
 const VolunteersPage = lazy(() => import('./pages/VolunteersPage').then(m => ({ default: m.VolunteersPage })));
 const IncidentsPage = lazy(() => import('./pages/IncidentsPage').then(m => ({ default: m.IncidentsPage })));
-const GuestsPage = lazy(() => import('./pages/GuestsPage').then(m => ({ default: m.GuestsPage })));
+const RawDataPage = lazy(() => import('./pages/RawDataPage').then(m => ({ default: m.RawDataPage })));
 const WebsiteContentPage = lazy(() => import('./pages/WebsiteContentPage').then(m => ({ default: m.WebsiteContentPage })));
 
 export const router = createBrowserRouter([
@@ -22,7 +22,7 @@ export const router = createBrowserRouter([
       { path: '/reports', element: <Suspense fallback={<PageSkeleton />}><ReportsPage /></Suspense> },
       { path: '/volunteers', element: <Suspense fallback={<PageSkeleton />}><VolunteersPage /></Suspense> },
       { path: '/incidents', element: <Suspense fallback={<PageSkeleton />}><IncidentsPage /></Suspense> },
-      { path: '/guests', element: <Suspense fallback={<PageSkeleton />}><GuestsPage /></Suspense> },
+      { path: '/raw-data', element: <Suspense fallback={<PageSkeleton />}><RawDataPage /></Suspense> },
       { path: '/website-content', element: <Suspense fallback={<PageSkeleton />}><WebsiteContentPage /></Suspense> },
     ],
   },
