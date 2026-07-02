@@ -1,34 +1,44 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  content: [
+    path.join(__dirname, './index.html'),
+    path.join(__dirname, './src/**/*.{js,ts,jsx,tsx}'),
+  ],
   theme: {
     extend: {
       colors: {
+        // Deep warm charcoal — near-black with subtle warmth, won't read as brown
         navy: {
-          DEFAULT: '#1B3A5C',
-          50: '#E8EDF2',
-          100: '#C5D3E3',
-          200: '#9AB3CD',
-          300: '#6F93B7',
-          400: '#4473A1',
-          500: '#1B3A5C',
-          600: '#163050',
-          700: '#112644',
-          800: '#0D1D38',
-          900: '#08132C',
+          DEFAULT: '#1C1917',
+          50:  '#F5F4F3',
+          100: '#E8E5E3',
+          200: '#C9C4C1',
+          300: '#A8A09C',
+          400: '#6B6460',
+          500: '#1C1917',
+          600: '#171412',
+          700: '#12100E',
+          800: '#0D0B09',
+          900: '#080605',
         },
+        // Warm amber — from the "Daily" lettering in the logo
         gold: {
-          DEFAULT: '#C9A84C',
-          50: '#FBF6E9',
-          100: '#F5E9C8',
-          200: '#EDD89F',
-          300: '#E5C776',
-          400: '#D4B45E',
-          500: '#C9A84C',
-          600: '#B59340',
-          700: '#9A7E35',
-          800: '#7F682A',
-          900: '#5C4D23',
+          DEFAULT: '#D4892A',
+          50:  '#FDF4E7',
+          100: '#FAE3C0',
+          200: '#F5CB8A',
+          300: '#EFB35A',
+          400: '#E09B40',
+          500: '#D4892A',
+          600: '#B87424',
+          700: '#9C601E',
+          800: '#804D18',
+          900: '#5C3810',
         },
       },
       fontFamily: {
@@ -40,6 +50,35 @@ export default {
         'kiosk-xl': ['1.75rem', { lineHeight: '2.25rem' }],      // 28px
         'kiosk-2xl': ['2.25rem', { lineHeight: '2.75rem' }],     // 36px
         'kiosk-3xl': ['3rem', { lineHeight: '3.5rem' }],         // 48px
+      },
+      keyframes: {
+        shake: {
+          '0%, 100%': { transform: 'translateX(0)' },
+          '20%': { transform: 'translateX(-8px)' },
+          '40%': { transform: 'translateX(8px)' },
+          '60%': { transform: 'translateX(-6px)' },
+          '80%': { transform: 'translateX(6px)' },
+        },
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        bounceIn: {
+          '0%': { opacity: '0', transform: 'scale(0.6)' },
+          '60%': { opacity: '1', transform: 'scale(1.08)' },
+          '80%': { transform: 'scale(0.96)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        pulseOnce: {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.4' },
+        },
+      },
+      animation: {
+        shake: 'shake 0.5s ease-in-out',
+        'fade-in': 'fadeIn 0.4s ease-out',
+        'bounce-in': 'bounceIn 0.5s ease-out',
+        'pulse-once': 'pulseOnce 1s ease-in-out',
       },
     },
   },

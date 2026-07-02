@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react';
-import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 type RealtimeEvent = 'INSERT' | 'UPDATE' | 'DELETE';
 
@@ -40,8 +40,6 @@ export function useRealtimeTable({
     if (!enabled) return;
 
     const channelName = filter ? `${table}:${filter}` : table;
-    let channel: RealtimeChannel;
-
     const subscriptionConfig: Record<string, unknown> = {
       event: events.length === 3 ? '*' : events[0],
       schema: 'public',
@@ -51,7 +49,7 @@ export function useRealtimeTable({
       subscriptionConfig.filter = filter;
     }
 
-    channel = supabase
+    const channel = supabase
       .channel(channelName)
       .on(
         'postgres_changes' as never,
